@@ -82,6 +82,8 @@ export function ChatPanel({ roomId }: { roomId: string }) {
         };
 
         if (mediaFile) {
+            // In a real app, you'd upload this to a storage service
+            // and save the URL. For now, we use a local object URL.
             messageData.mediaUrl = mediaPreview; // Using local object URL
             messageData.mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
         }
@@ -223,12 +225,12 @@ export function ChatPanel({ roomId }: { roomId: string }) {
               className="flex-1"
             />
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
-            <Button variant="ghost" size="icon" disabled={!user} onClick={() => fileInputRef.current?.click()}>
+            <Button variant="ghost" size="icon" type="button" disabled={!user} onClick={() => fileInputRef.current?.click()}>
               <Paperclip className="h-5 w-5" />
             </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" disabled={!user}>
+                <Button variant="ghost" size="icon" type="button" disabled={!user}>
                   <Smile className="h-5 w-5" />
                 </Button>
               </PopoverTrigger>
@@ -245,5 +247,3 @@ export function ChatPanel({ roomId }: { roomId: string }) {
     </Card>
   );
 }
-
-    
