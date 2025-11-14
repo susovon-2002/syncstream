@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { generatePreviewAction } from '@/actions/generate-preview';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,7 @@ function SubmitButton() {
 
 export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const initialState = { success: false, message: '', preview: undefined };
-  const [state, formAction] = useFormState(generatePreviewAction, initialState);
+  const [state, formAction] = useActionState(generatePreviewAction, initialState);
 
   return (
     <Tabs defaultValue="url" className="w-full">
