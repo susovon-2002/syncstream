@@ -1,25 +1,25 @@
-"use client";
+'use client';
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { generatePreviewAction } from '@/actions/generate-preview';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Label } from '../ui/label';
-import { Film, Link, Loader2, UploadCloud } from 'lucide-react';
+import { Film, Link as LinkIcon, Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 
 interface AddMediaTabsProps {
-  onUrlSelect: (url: string) => void;
+  onUrlSelect: (url: string, title: string, source: 'youtube' | 'file') => void;
 }
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="w-full">
-      {pending ? <Loader2 className="animate-spin mr-2" /> : <Link className="mr-2" />}
+      {pending ? <Loader2 className="animate-spin mr-2" /> : <LinkIcon className="mr-2" />}
       Generate Preview
     </Button>
   );
@@ -30,12 +30,25 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const [state, formAction] = useActionState(generatePreviewAction, initialState);
 
   const canWatch = state.success && state.preview && !state.preview.error;
+  
+  const isYoutubeUrl = (url: string) => {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/;
+    return youtubeRegex.test(url);
+  }
+
+  const handleWatch = () => {
+    if (!state.preview?.imageUrl) return;
+    const url = state.preview.imageUrl;
+    const title = state.preview.title;
+    const source = isYoutubeUrl(url) ? 'youtube' : 'file';
+    onUrlSelect(url, title, source);
+  };
 
   return (
     <Tabs defaultValue="url" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="url">From URL</TabsTrigger>
-        <TabsTrigger value="upload">Upload File</TabsTrigger>
+        <TabsTrigger value="upload" disabled>Upload File</TabsTrigger>
       </TabsList>
       <TabsContent value="url">
         <Card className="border-none shadow-none bg-transparent">
@@ -63,7 +76,7 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
                     </div>
                   </CardContent>
                 </Card>
-                <Button className="w-full" onClick={() => onUrlSelect(state.preview!.imageUrl)}>
+                <Button className="w-full" onClick={handleWatch}>
                   <Film className="mr-2"/> Watch this
                 </Button>
               </div>

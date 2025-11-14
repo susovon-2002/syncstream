@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -8,47 +8,61 @@ import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-
-const participants = [
-  { name: 'Alex', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d' },
-  { name: 'Mia', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026705d' },
-  { name: 'You', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026706d' },
-];
-
-const initialMessages = [
-  { user: 'Alex', text: 'Hey everyone! Ready for this movie?' },
-  { user: 'Mia', text: 'Yesss, I have my popcorn ready! 🍿' },
-];
-
-type Message = {
-  user: string;
-  text: string;
-};
+import { useFirebase } from '@/firebase';
+import { useCollection } from '@/firebase';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useMemoFirebase } from '@/firebase/provider';
 
 export function ChatPanel({ roomId }: { roomId: string }) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { firestore, user } = useFirebase();
   const [newMessage, setNewMessage] = useState('');
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const messagesRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'chatMessages'), [firestore, roomId]);
+  const messagesQuery = useMemoFirebase(() => query(messagesRef, orderBy('timestamp', 'asc'), limit(50)), [messagesRef]);
+  const { data: messages, isLoading: loadingMessages } = useCollection(messagesQuery);
+  
+  const roomUsersRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'roomUsers'), [firestore, roomId]);
+  const { data: participants, isLoading: loadingParticipants } = useCollection(roomUsersRef);
+
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim()) {
-      setMessages([...messages, { user: 'You', text: newMessage }]);
+    if (newMessage.trim() && user) {
+      addDocumentNonBlocking(messagesRef, {
+        userId: user.uid,
+        username: user.displayName || 'Anonymous',
+        avatar: user.photoURL,
+        message: newMessage,
+        timestamp: new Date(),
+      });
       setNewMessage('');
     }
   };
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        // @ts-ignore
+        scrollAreaRef.current.scrollTo({
+            top: scrollAreaRef.current.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+  }, [messages]);
 
   return (
     <Card className="h-full flex flex-col bg-card/80">
       <CardHeader>
         <CardTitle className="text-lg">Participants</CardTitle>
         <div className="flex items-center gap-3 pt-2">
-          {participants.map((p) => (
-            <div key={p.name} className="flex flex-col items-center gap-1">
+          {!loadingParticipants && participants?.map((p) => (
+            <div key={p.id} className="flex flex-col items-center gap-1">
               <Avatar>
-                <AvatarImage src={p.avatar} />
-                <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
+                <AvatarImage src={p.photoURL} />
+                <AvatarFallback>{p.displayName?.charAt(0) || 'A'}</AvatarFallback>
               </Avatar>
-              <span className="text-xs text-muted-foreground">{p.name}</span>
+              <span className="text-xs text-muted-foreground">{p.uid === user?.uid ? 'You' : p.displayName}</span>
             </div>
           ))}
         </div>
@@ -58,15 +72,16 @@ export function ChatPanel({ roomId }: { roomId: string }) {
         <div className="p-4">
           <h3 className="text-lg font-semibold">Live Chat</h3>
         </div>
-        <ScrollArea className="flex-1 px-4">
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="space-y-4">
-            {messages.map((msg, index) => (
-              <div key={index} className={`flex items-start gap-2 ${msg.user === 'You' ? 'justify-end' : ''}`}>
-                <div className={`flex flex-col ${msg.user === 'You' ? 'items-end' : 'items-start'}`}>
-                  <div className={`rounded-lg px-3 py-2 ${msg.user === 'You' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
-                    <p className="text-sm">{msg.text}</p>
+            {loadingMessages && <p className="text-center text-muted-foreground">Loading chat...</p>}
+            {messages?.map((msg) => (
+              <div key={msg.id} className={`flex items-start gap-2 ${msg.userId === user?.uid ? 'justify-end' : ''}`}>
+                <div className={`flex flex-col ${msg.userId === user?.uid ? 'items-end' : 'items-start'}`}>
+                  <div className={`rounded-lg px-3 py-2 ${msg.userId === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
+                    <p className="text-sm">{msg.message}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground mt-1">{msg.user}</span>
+                  <span className="text-xs text-muted-foreground mt-1">{msg.username}</span>
                 </div>
               </div>
             ))}
@@ -75,11 +90,12 @@ export function ChatPanel({ roomId }: { roomId: string }) {
         <div className="p-4 border-t">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
-              placeholder="Say something..."
+              placeholder={user ? "Say something..." : "Sign in to chat"}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              disabled={!user}
             />
-            <Button type="submit" size="icon">
+            <Button type="submit" size="icon" disabled={!user}>
               <Send className="h-4 w-4" />
             </Button>
           </form>

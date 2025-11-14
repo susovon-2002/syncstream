@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
@@ -8,119 +8,208 @@ import { Card } from '../ui/card';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
+import { useFirebase } from '@/firebase';
+import { doc, serverTimestamp } from 'firebase/firestore';
+import { useDocumentData } from 'react-firebase-hooks/firestore';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import ReactPlayer from 'react-player/lazy';
+import { useMemoFirebase } from '@/firebase/provider';
 
-export function VideoPlayer({ roomId }: { roomId: string }) {
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+type MediaSource = 'youtube' | 'file' | null;
+
+interface VideoPlayerProps {
+  roomId: string;
+  isHost: boolean;
+}
+
+export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
+  const { firestore, user } = useFirebase();
+
+  // Component State
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<HTMLDivElement>(null);
+  // Refs
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<ReactPlayer>(null);
+  const seekingRef = useRef(false); // To prevent seek feedback loops
 
-  const placeholderImage = PlaceHolderImages.find(p => p.id === 'video-placeholder');
+  // Firebase Room State
+  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
+  const [roomState, loadingRoomState] = useDocumentData(roomRef);
 
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
+  const mediaUrl = roomState?.media?.url;
+  const mediaSource: MediaSource = roomState?.media?.source;
+  const isPlaying = roomState?.playback?.isPlaying;
+
+  // Derived State
+  const placeholderImage = PlaceHolderImages.find((p) => p.id === 'video-placeholder');
+
+  // Sync client player to Firebase state
+  useEffect(() => {
+    const video = playerRef.current;
+    if (!video || !roomState?.playback || seekingRef.current || !isReady) return;
+
+    // Sync playing state
+    if (video.props.playing !== isPlaying) {
+      // Handled by ReactPlayer's `playing` prop
+    }
+    
+    // Sync seeking
+    const serverTime = roomState.playback.lastUpdated.toDate().getTime();
+    const clientTime = new Date().getTime();
+    const timeDiff = (clientTime - serverTime) / 1000;
+    
+    let targetTime = roomState.playback.progress;
+    if(isPlaying) {
+        targetTime += timeDiff;
+    }
+
+    const localTime = video.getCurrentTime();
+
+    // Only seek if the difference is more than 2 seconds to avoid jitter
+    if (Math.abs(targetTime - localTime) > 2) {
+      video.seekTo(targetTime, 'seconds');
+    }
+
+  }, [roomState, isReady, isPlaying]);
+
+
+  const updatePlaybackState = (state: any) => {
+    if (!isHost || !roomRef) return;
+    setDocumentNonBlocking(roomRef, {
+        playback: {
+          ...roomState?.playback,
+          ...state,
+          lastUpdated: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  };
+
+  const handleSelectMedia = (url: string, title: string, source: 'youtube' | 'file') => {
+    if (!isHost || !roomRef) return;
+     setDocumentNonBlocking(roomRef, {
+        media: { url, title, source },
+        playback: {
+          isPlaying: false,
+          progress: 0,
+          lastUpdated: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  };
+
+  const handlePlay = () => isHost && updatePlaybackState({ isPlaying: true });
+  const handlePause = () => isHost && updatePlaybackState({ isPlaying: false });
+  
+  const handleProgress = (state: { playedSeconds: number }) => {
+    setProgress(state.playedSeconds);
+     if (isHost && !seekingRef.current) {
+        updatePlaybackState({ progress: state.playedSeconds });
+    }
+  };
+
+  const handleSeek = (value: number[]) => {
+    const newTime = value[0];
+    setProgress(newTime);
+    if(isHost) {
+        if(playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+        updatePlaybackState({ progress: newTime });
     }
   };
 
   const handleVolumeChange = (value: number[]) => {
-    if (videoRef.current) {
-      const newVolume = value[0];
-      videoRef.current.volume = newVolume;
-      setVolume(newVolume);
-      setIsMuted(newVolume === 0);
-    }
+    const newVolume = value[0];
+    setVolume(newVolume);
+    setIsMuted(newVolume === 0);
   };
 
-  const handleMuteToggle = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const handleProgressChange = (value: number[]) => {
-    if (videoRef.current) {
-      const newTime = value[0];
-      videoRef.current.currentTime = newTime;
-      setProgress(newTime);
-    }
-  };
+  const handleMuteToggle = () => setIsMuted(!isMuted);
 
   const handleFullscreenToggle = () => {
-    if (!playerRef.current) return;
+    if (!playerContainerRef.current) return;
     if (!document.fullscreenElement) {
-      playerRef.current.requestFullscreen();
-      setIsFullscreen(true);
+      playerContainerRef.current.requestFullscreen();
     } else {
       document.exitFullscreen();
-      setIsFullscreen(false);
     }
   };
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const updateProgress = () => setProgress(video.currentTime);
-    const updateDuration = () => setDuration(video.duration);
-
-    video.addEventListener('timeupdate', updateProgress);
-    video.addEventListener('loadedmetadata', updateDuration);
-    return () => {
-      video.removeEventListener('timeupdate', updateProgress);
-      video.removeEventListener('loadedmetadata', updateDuration);
-    };
-  }, [mediaUrl]);
-  
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
+
   const formatTime = (time: number) => {
+    if (isNaN(time) || time < 0) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
-    <Card ref={playerRef} className="h-full w-full bg-card/80 flex flex-col items-center justify-center relative overflow-hidden group">
+    <Card ref={playerContainerRef} className="h-full w-full bg-card/80 flex flex-col items-center justify-center relative overflow-hidden group">
       {!mediaUrl ? (
         <div className="w-full max-w-lg p-4">
-          <AddMediaTabs onUrlSelect={setMediaUrl} />
+          {isHost ? (
+            <AddMediaTabs onUrlSelect={handleSelectMedia} />
+          ) : (
+            <div className="text-center text-muted-foreground">
+              <p>Waiting for the host to select a video...</p>
+            </div>
+          )}
         </div>
       ) : (
-        <video ref={videoRef} src={mediaUrl} className="h-full w-full object-contain" onClick={handlePlayPause}></video>
+        <ReactPlayer
+            ref={playerRef}
+            url={mediaUrl}
+            playing={isPlaying}
+            controls={false}
+            volume={volume}
+            muted={isMuted}
+            width="100%"
+            height="100%"
+            onReady={() => setIsReady(true)}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onProgress={handleProgress}
+            onDuration={setDuration}
+            progressInterval={1000}
+            config={{
+                youtube: { playerVars: { showinfo: 0, controls: 0 } },
+                file: { attributes: { style: { objectFit: 'contain' } } }
+            }}
+        />
       )}
 
-      {mediaUrl && (
+      {mediaUrl && isReady && (
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <div className="flex flex-col gap-2">
-            <Slider
+             <Slider
               value={[progress]}
               max={duration}
-              onValueChange={handleProgressChange}
+              onValueChange={handleSeek}
+              onPointerDown={() => seekingRef.current = true}
+              onPointerUp={() => seekingRef.current = false}
               className="w-full cursor-pointer"
+              disabled={!isHost}
             />
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handlePlayPause}>
-                  {isPlaying ? <Pause /> : <Play />}
-                </Button>
+                {isHost && (
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay}>
+                    {isPlaying ? <Pause /> : <Play />}
+                  </Button>
+                )}
                 <div className="flex items-center gap-2 w-32">
                   <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleMuteToggle}>
                     {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}

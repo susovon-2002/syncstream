@@ -1,25 +1,54 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ArrowRight, PartyPopper } from 'lucide-react';
+import { useFirebase } from '@/firebase';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { doc } from 'firebase/firestore';
 
 export function Hero() {
   const [roomId, setRoomId] = useState('');
   const router = useRouter();
+  const { auth, user, firestore } = useFirebase();
+
+  useEffect(() => {
+    if (!user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [user, auth]);
 
   const handleCreateRoom = () => {
+    if (!user) return;
     const newRoomId = Math.random().toString(36).substring(2, 8);
+    
+    const roomRef = doc(firestore, 'rooms', newRoomId);
+    setDocumentNonBlocking(roomRef, {
+      id: newRoomId,
+      hostId: user.uid,
+      createdAt: new Date(),
+      members: {
+        [user.uid]: 'host',
+      }
+    }, { merge: true });
+
     router.push(`/room/${newRoomId}`);
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (roomId.trim()) {
+    if (roomId.trim() && user) {
+       const roomRef = doc(firestore, 'rooms', roomId.trim());
+        setDocumentNonBlocking(roomRef, {
+            members: {
+                [user.uid]: 'participant'
+            }
+        }, { merge: true });
       router.push(`/room/${roomId.trim()}`);
     }
   };
@@ -39,7 +68,7 @@ export function Hero() {
           <CardDescription>Create a new room or join an existing one.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button size="lg" className="w-full font-bold text-lg" onClick={handleCreateRoom}>
+          <Button size="lg" className="w-full font-bold text-lg" onClick={handleCreateRoom} disabled={!user}>
             <PartyPopper className="mr-2" /> Create a New Room
           </Button>
 
@@ -57,8 +86,9 @@ export function Hero() {
               onChange={(e) => setRoomId(e.target.value)}
               className="font-code text-center tracking-widest"
               aria-label="Room ID to join"
+              disabled={!user}
             />
-            <Button type="submit" size="icon" variant="secondary" aria-label="Join Room">
+            <Button type="submit" size="icon" variant="secondary" aria-label="Join Room" disabled={!user}>
               <ArrowRight />
             </Button>
           </form>
