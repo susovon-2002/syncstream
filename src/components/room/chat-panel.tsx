@@ -63,7 +63,8 @@ export function ChatPanel({ roomId }: { roomId: string }) {
 
   const getUsername = (userId: string) => {
     const participant = participants?.find(p => p.uid === userId);
-    return participant?.displayName || 'Anonymous';
+    const displayName = participant?.displayName || 'Anonymous';
+    return displayName.split(' ')[0];
   }
   
   const getUserAvatar = (userId: string) => {
