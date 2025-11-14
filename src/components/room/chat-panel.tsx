@@ -26,14 +26,21 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const roomUsersRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'roomUsers'), [firestore, roomId]);
   const { data: participants, isLoading: loadingParticipants } = useCollection(roomUsersRef);
 
+  const getUsername = (userId: string) => {
+    const participant = participants?.find(p => p.uid === userId);
+    return participant?.displayName || 'Anonymous';
+  }
+  
+  const getUserAvatar = (userId: string) => {
+    const participant = participants?.find(p => p.uid === userId);
+    return participant?.photoURL;
+  }
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() && user) {
       addDocumentNonBlocking(messagesRef, {
         userId: user.uid,
-        username: user.displayName || 'Anonymous',
-        avatar: user.photoURL,
         message: newMessage,
         timestamp: new Date(),
       });
@@ -81,7 +88,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
                   <div className={`rounded-lg px-3 py-2 ${msg.userId === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
                     <p className="text-sm">{msg.message}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground mt-1">{msg.username}</span>
+                  <span className="text-xs text-muted-foreground mt-1">{getUsername(msg.userId)}</span>
                 </div>
               </div>
             ))}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,20 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { ArrowRight, PartyPopper } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { doc } from 'firebase/firestore';
+import Link from 'next/link';
 
 export function Hero() {
   const [roomId, setRoomId] = useState('');
   const router = useRouter();
-  const { auth, user, firestore } = useFirebase();
-
-  useEffect(() => {
-    if (!user) {
-      initiateAnonymousSignIn(auth);
-    }
-  }, [user, auth]);
+  const { user, firestore } = useFirebase();
 
   const handleCreateRoom = () => {
     if (!user) return;
@@ -68,30 +62,37 @@ export function Hero() {
           <CardDescription>Create a new room or join an existing one.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button size="lg" className="w-full font-bold text-lg" onClick={handleCreateRoom} disabled={!user}>
-            <PartyPopper className="mr-2" /> Create a New Room
-          </Button>
+          {user ? (
+            <>
+              <Button size="lg" className="w-full font-bold text-lg" onClick={handleCreateRoom}>
+                <PartyPopper className="mr-2" /> Create a New Room
+              </Button>
 
-          <div className="flex items-center gap-4">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">OR</span>
-            <Separator className="flex-1" />
-          </div>
-          
-          <form onSubmit={handleJoinRoom} className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Enter Room ID..."
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              className="font-code text-center tracking-widest"
-              aria-label="Room ID to join"
-              disabled={!user}
-            />
-            <Button type="submit" size="icon" variant="secondary" aria-label="Join Room" disabled={!user}>
-              <ArrowRight />
-            </Button>
-          </form>
+              <div className="flex items-center gap-4">
+                <Separator className="flex-1" />
+                <span className="text-xs text-muted-foreground">OR</span>
+                <Separator className="flex-1" />
+              </div>
+              
+              <form onSubmit={handleJoinRoom} className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Enter Room ID..."
+                  value={roomId}
+                  onChange={(e) => setRoomId(e.target.value)}
+                  className="font-code text-center tracking-widest"
+                  aria-label="Room ID to join"
+                />
+                <Button type="submit" size="icon" variant="secondary" aria-label="Join Room">
+                  <ArrowRight />
+                </Button>
+              </form>
+            </>
+          ) : (
+             <Button size="lg" className="w-full" asChild>
+                <Link href="/login">Login to Get Started</Link>
+             </Button>
+          )}
         </CardContent>
       </Card>
     </div>

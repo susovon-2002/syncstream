@@ -11,13 +11,14 @@ import { VideoPlayer } from '@/components/room/video-player';
 import { Users } from 'lucide-react';
 import { RoomIdDisplay } from '@/components/room/room-id-display';
 import { useCollection } from '@/firebase';
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useMemoFirebase } from '@/firebase/provider';
+import { useRouter } from 'next/navigation';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { id } = use(params);
-  const { auth, firestore, user } = useFirebase();
+  const { auth, firestore, user, isUserLoading } = useFirebase();
+  const router = useRouter();
 
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', id), [firestore, id]);
   const [room, loadingRoom] = useDocumentData(roomRef);
@@ -25,12 +26,12 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   const roomUsersRef = useMemoFirebase(() => roomRef && collection(roomRef, 'roomUsers'), [roomRef]);
   const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
 
-  // Sign in anonymously if not authenticated
+  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!user) {
-      initiateAnonymousSignIn(auth);
+    if (!isUserLoading && !user) {
+      router.push('/login');
     }
-  }, [auth, user]);
+  }, [user, isUserLoading, router]);
 
   // Handle user joining/leaving room
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
       const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
       setDocumentNonBlocking(userRef, {
         uid: user.uid,
-        displayName: user.displayName || 'Anonymous',
+        displayName: user.displayName || user.email || 'Anonymous',
         photoURL: user.photoURL,
         joinedAt: new Date(),
       }, { merge: true });
@@ -49,6 +50,17 @@ export default function RoomPage({ params }: { params: { id: string } }) {
 
 
   const isHost = user && room ? room.hostId === user.uid : false;
+
+  if (isUserLoading || loadingRoom || !user) {
+    return (
+      <div className="flex flex-col h-dvh bg-background">
+         <Header />
+         <main className="flex-1 flex items-center justify-center">
+            <p>Loading room...</p>
+         </main>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-dvh bg-background">
@@ -61,8 +73,8 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           <RoomIdDisplay roomId={id} />
         </div>
       </Header>
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 overflow-hidden">
-        <div className="lg:col-span-4 h-full min-h-0">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-4 p-4 overflow-hidden">
+        <div className="lg:col-span-1 h-full min-h-0">
           <VideoPlayer roomId={id} isHost={isHost} />
         </div>
         <div className="lg:col-span-1 h-full min-h-0">
