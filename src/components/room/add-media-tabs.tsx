@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '../ui/label';
-import { Film, UploadCloud } from 'lucide-react';
+import { Film, Monitor, UploadCloud } from 'lucide-react';
 
 interface AddMediaTabsProps {
-  onUrlSelect: (url: string, title: string, source: 'youtube' | 'file') => void;
+  onUrlSelect: (url: string | MediaStream, title: string, source: 'youtube' | 'file' | 'screen') => void;
 }
 
 export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
@@ -23,17 +23,28 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const handleAddUrl = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
+    
+    const isDirectLink = /\.(mp4|webm|mkv|mp3|ogg|wav)$/i.test(url);
 
     const source = isYoutubeUrl(url) ? 'youtube' : 'file';
     const title = url.split('/').pop() || 'Direct Media';
     onUrlSelect(url, title, source);
   };
   
+  const handleShareScreen = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      onUrlSelect(stream, "Screen Share", 'screen');
+    } catch (error) {
+      console.error("Error sharing screen:", error);
+    }
+  };
 
   return (
     <Tabs defaultValue="url" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="url">From URL</TabsTrigger>
+        <TabsTrigger value="screen">Share Screen</TabsTrigger>
         <TabsTrigger value="upload" disabled>Upload File</TabsTrigger>
       </TabsList>
       <TabsContent value="url">
@@ -49,6 +60,19 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
                 <Film className="mr-2"/> Watch
               </Button>
             </form>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      <TabsContent value="screen">
+        <Card className="border-none shadow-none bg-transparent">
+          <CardHeader>
+            <CardTitle>Share Your Screen</CardTitle>
+            <CardDescription>Share a window, tab, or your entire screen with the room.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={handleShareScreen} className="w-full">
+              <Monitor className="mr-2" /> Start Screen Share
+            </Button>
           </CardContent>
         </Card>
       </TabsContent>

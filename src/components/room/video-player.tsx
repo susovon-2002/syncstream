@@ -24,6 +24,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   const { firestore } = useFirebase();
 
   // Component State
+  const [localMedia, setLocalMedia] = useState<string | MediaStream | null>(null);
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -40,7 +41,8 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
   const [roomState, loadingRoomState] = useDocumentData(roomRef);
 
-  const mediaUrl = roomState?.media?.url;
+  const isScreenShare = roomState?.media?.source === 'screen';
+  const mediaUrl = isScreenShare ? localMedia : roomState?.media?.url;
   const isPlaying = roomState?.playback?.isPlaying;
 
   // Derived State
@@ -49,7 +51,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   // Sync client player to Firebase state
   useEffect(() => {
     const video = playerRef.current;
-    if (!video || !roomState?.playback?.lastUpdated || seekingRef.current || !isReady) return;
+    if (!video || !roomState?.playback || seekingRef.current || !isReady || isScreenShare) return;
 
     if (video.props.playing !== isPlaying) {
       // Handled by ReactPlayer's `playing` prop
@@ -72,11 +74,11 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
       video.seekTo(targetTime, 'seconds');
     }
 
-  }, [roomState, isReady, isPlaying]);
+  }, [roomState, isReady, isPlaying, isScreenShare]);
 
 
   const updatePlaybackState = (state: any) => {
-    if (!isHost || !roomRef) return;
+    if (!isHost || !roomRef || isScreenShare) return;
     setDocumentNonBlocking(roomRef, {
         playback: {
           ...roomState?.playback,
@@ -88,18 +90,35 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
     );
   };
 
-  const handleSelectMedia = (url: string, title: string, source: 'youtube' | 'file') => {
+  const handleSelectMedia = (url: string | MediaStream, title: string, source: 'youtube' | 'file' | 'screen') => {
     if (!isHost || !roomRef) return;
-     setDocumentNonBlocking(roomRef, {
-        media: { url, title, source },
-        playback: {
-          isPlaying: false,
-          progress: 0,
-          lastUpdated: serverTimestamp(),
+    
+    if (source === 'screen' && url instanceof MediaStream) {
+      setLocalMedia(url);
+      setDocumentNonBlocking(roomRef, {
+        media: { url: null, title, source },
+        playback: { isPlaying: true, progress: 0, lastUpdated: serverTimestamp() }
+      }, { merge: true });
+
+      url.getVideoTracks()[0].onended = () => {
+        setLocalMedia(null);
+        setDocumentNonBlocking(roomRef, { media: null, playback: null }, { merge: true });
+      };
+
+    } else if (typeof url === 'string') {
+      if (localMedia) {
+        if (localMedia instanceof MediaStream) {
+            localMedia.getTracks().forEach(track => track.stop());
         }
-      },
-      { merge: true }
-    );
+        setLocalMedia(null);
+      }
+      setDocumentNonBlocking(roomRef, {
+          media: { url, title, source },
+          playback: { isPlaying: false, progress: 0, lastUpdated: serverTimestamp() }
+        },
+        { merge: true }
+      );
+    }
   };
 
   const handlePlay = () => isHost && updatePlaybackState({ isPlaying: true });
@@ -107,7 +126,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
-     if (isHost && !seekingRef.current) {
+     if (isHost && !seekingRef.current && !isScreenShare) {
         updatePlaybackState({ progress: state.playedSeconds });
     }
   };
@@ -115,7 +134,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   const handleSeek = (value: number[]) => {
     const newTime = value[0];
     setProgress(newTime);
-    if(isHost) {
+    if(isHost && !isScreenShare) {
         if(playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
         updatePlaybackState({ progress: newTime });
     }
@@ -152,9 +171,11 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const showPlayer = !!mediaUrl || (isHost && isScreenShare);
+
   return (
     <Card ref={playerContainerRef} className="h-full w-full bg-card/80 flex flex-col items-center justify-center relative overflow-hidden group">
-      {!mediaUrl ? (
+      {!showPlayer ? (
         <div className="w-full max-w-lg p-4">
           {isHost ? (
             <AddMediaTabs onUrlSelect={handleSelectMedia} />
@@ -167,7 +188,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
       ) : (
         <ReactPlayer
             ref={playerRef}
-            url={mediaUrl}
+            url={mediaUrl as (string | MediaStream)}
             playing={isPlaying}
             controls={false}
             volume={volume}
@@ -187,7 +208,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
         />
       )}
 
-      {mediaUrl && (
+      {showPlayer && !isScreenShare && (
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <div className="flex flex-col gap-2">
             <Slider
@@ -224,7 +245,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
         </div>
       )}
 
-      {!mediaUrl && placeholderImage && (
+      {!showPlayer && placeholderImage && (
         <Image
           src={placeholderImage.imageUrl}
           alt={placeholderImage.description}
