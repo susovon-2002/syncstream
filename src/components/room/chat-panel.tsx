@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Crown, Send, Video, VideoOff } from 'lucide-react';
+import { Crown, Send, Video, VideoOff, Smile } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { useFirebase } from '@/firebase';
@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 
 
 export function ChatPanel({ roomId }: { roomId: string }) {
@@ -76,6 +78,10 @@ export function ChatPanel({ roomId }: { roomId: string }) {
       });
       setNewMessage('');
     }
+  };
+
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    setNewMessage(prevMessage => prevMessage + emojiData.emoji);
   };
 
   useEffect(() => {
@@ -158,13 +164,24 @@ export function ChatPanel({ roomId }: { roomId: string }) {
           </div>
         </ScrollArea>
         <div className="p-4 border-t">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+          <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
             <Input
               placeholder={user ? "Say something..." : "Sign in to chat"}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               disabled={!user}
+              className="flex-1"
             />
+             <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={!user}>
+                  <Smile className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-0">
+                <EmojiPicker onEmojiClick={onEmojiClick} />
+              </PopoverContent>
+            </Popover>
             <Button type="submit" size="icon" disabled={!user}>
               <Send className="h-4 w-4" />
             </Button>
