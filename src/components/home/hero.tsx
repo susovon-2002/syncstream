@@ -18,12 +18,13 @@ export function Hero() {
   const { user, firestore } = useFirebase();
 
   const handleCreateRoom = () => {
-    if (!user) return;
+    if (!user || !firestore) return;
     const newRoomId = Math.random().toString(36).substring(2, 8);
     
     const roomRef = doc(firestore, 'rooms', newRoomId);
     setDocumentNonBlocking(roomRef, {
       id: newRoomId,
+      name: `${user.displayName || 'Anonymous'}'s Room`,
       hostId: user.uid,
       createdAt: new Date(),
       members: {
@@ -36,7 +37,7 @@ export function Hero() {
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (roomId.trim() && user) {
+    if (roomId.trim() && user && firestore) {
        const roomRef = doc(firestore, 'rooms', roomId.trim());
         setDocumentNonBlocking(roomRef, {
             members: {
