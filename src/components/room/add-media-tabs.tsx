@@ -1,64 +1,34 @@
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { generatePreviewAction } from '@/actions/generate-preview';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '../ui/label';
-import { Film, Link as LinkIcon, Loader2, UploadCloud } from 'lucide-react';
-import Image from 'next/image';
-import { useState } from 'react';
+import { Film, UploadCloud } from 'lucide-react';
 
 interface AddMediaTabsProps {
   onUrlSelect: (url: string, title: string, source: 'youtube' | 'file') => void;
 }
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="w-full">
-      {pending ? <Loader2 className="animate-spin mr-2" /> : <LinkIcon className="mr-2" />}
-      Generate Preview
-    </Button>
-  );
-}
-
 export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const [url, setUrl] = useState('');
-  const initialState = { success: false, message: '', preview: undefined };
-  const [state, formAction] = useActionState(generatePreviewAction, initialState);
 
-  const canWatch = state.success && state.preview && !state.preview.error;
-  
   const isYoutubeUrl = (url: string) => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/;
     return youtubeRegex.test(url);
   }
 
-  const isDirectMediaUrl = (url: string) => {
-    return /\.(mp4|webm|mkv|mp3|ogg|wav)$/i.test(url);
-  }
+  const handleAddUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!url) return;
 
-  const handleWatch = () => {
-    if (!state.preview?.imageUrl) return;
-    const url = state.preview.imageUrl;
-    const title = state.preview.title;
     const source = isYoutubeUrl(url) ? 'youtube' : 'file';
+    const title = url.split('/').pop() || 'Direct Media';
     onUrlSelect(url, title, source);
   };
   
-  const handleFormSubmit = (formData: FormData) => {
-    const url = formData.get('url') as string;
-    if (isDirectMediaUrl(url)) {
-        const title = url.split('/').pop() || 'Direct Media';
-        onUrlSelect(url, title, 'file');
-    } else {
-        formAction(formData);
-    }
-  }
 
   return (
     <Tabs defaultValue="url" className="w-full">
@@ -73,30 +43,12 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
             <CardDescription>Enter a video or audio URL to start watching.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!canWatch ? (
-              <form action={handleFormSubmit} className="space-y-4">
-                <Input name="url" placeholder="https://example.com/video.mp4" required onChange={(e) => setUrl(e.target.value)} value={url} />
-                <SubmitButton />
-                {state.message && !state.success && <p className="text-sm text-destructive">{state.message}</p>}
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <Card>
-                  <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
-                    <div className="relative w-full md:w-32 h-24 md:h-full rounded-md overflow-hidden shrink-0">
-                      <Image src={state.preview!.imageUrl} alt={state.preview!.title} fill className="object-cover" />
-                    </div>
-                    <div className="space-y-1 text-left">
-                      <h3 className="font-semibold line-clamp-1">{state.preview!.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{state.preview!.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Button className="w-full" onClick={handleWatch}>
-                  <Film className="mr-2"/> Watch this
-                </Button>
-              </div>
-            )}
+            <form onSubmit={handleAddUrl} className="space-y-4">
+              <Input name="url" placeholder="https://example.com/video.mp4" required onChange={(e) => setUrl(e.target.value)} value={url} />
+              <Button type="submit" className="w-full">
+                <Film className="mr-2"/> Watch
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </TabsContent>
