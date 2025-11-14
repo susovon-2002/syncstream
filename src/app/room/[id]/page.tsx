@@ -20,18 +20,18 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   const { auth, firestore, user, isUserLoading } = useFirebase();
   const router = useRouter();
 
-  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', id), [firestore, id]);
-  const [room, loadingRoom] = useDocumentData(roomRef);
-
-  const roomUsersRef = useMemoFirebase(() => roomRef && collection(roomRef, 'roomUsers'), [roomRef]);
-  const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
-
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  const roomRef = useMemoFirebase(() => firestore ? doc(firestore, 'rooms', id) : null, [firestore, id]);
+  const [room, loadingRoom] = useDocumentData(roomRef);
+
+  const roomUsersRef = useMemoFirebase(() => roomRef && user ? collection(roomRef, 'roomUsers') : null, [roomRef, user]);
+  const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
 
   // Handle user joining/leaving room
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           <RoomIdDisplay roomId={id} />
         </div>
       </Header>
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-4 p-4 overflow-hidden">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 p-4 overflow-hidden">
         <div className="lg:col-span-1 h-full min-h-0">
           <VideoPlayer roomId={id} isHost={isHost} />
         </div>
