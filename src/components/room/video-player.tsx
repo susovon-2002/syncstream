@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { AddMediaTabs } from './add-media-tabs';
 import { Card } from '../ui/card';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Camera, Video as VideoIcon, Circle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { useFirebase } from '@/firebase';
@@ -14,6 +14,7 @@ import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import ReactPlayer from 'react-player/lazy';
 import { useMemoFirebase } from '@/firebase/provider';
+import { useToast } from '@/hooks/use-toast';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -21,6 +22,7 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const { firestore, user } = useFirebase();
+  const { toast } = useToast();
 
   // Component State
   const [localMedia, setLocalMedia] = useState<string | MediaStream | null>(null);
@@ -30,11 +32,14 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   
   // Refs
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<ReactPlayer>(null);
   const seekingRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   // Firebase Room State
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
@@ -162,6 +167,76 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     }
   };
 
+  const handleScreenshot = () => {
+    if (!playerRef.current) return;
+    const player = playerRef.current.getInternalPlayer() as HTMLVideoElement;
+    if (!player) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = player.videoWidth;
+    canvas.height = player.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `syncstream-screenshot-${new Date().toISOString()}.png`;
+    a.click();
+    toast({ title: "Screenshot saved!" });
+  };
+
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      // Stop recording
+      mediaRecorderRef.current?.stop();
+    } else {
+      // Start recording
+      if (!playerRef.current) return;
+      const player = playerRef.current.getInternalPlayer() as HTMLVideoElement;
+      if (!player) return;
+
+      const stream = (player as any).captureStream();
+      if (!stream) {
+        toast({ variant: 'destructive', title: 'Could not start recording', description: 'Unable to capture video stream.' });
+        return;
+      }
+      
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      recordedChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `syncstream-recording-${new Date().toISOString()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Recording saved!" });
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      toast({ title: "Recording started..." });
+    }
+  };
+
+  useEffect(() => {
+    if (mediaRecorderRef.current?.state === 'recording' && !isPlaying) {
+      // If playback pauses, stop the recording to prevent silent videos
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }, [isPlaying]);
+
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFsChange);
@@ -208,7 +283,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
             progressInterval={1000}
             config={{
                 youtube: { playerVars: { showinfo: 0, controls: 0 } },
-                file: { attributes: { style: { objectFit: 'contain' } } }
+                file: { attributes: { style: { objectFit: 'contain' }, crossOrigin: 'anonymous' } }
             }}
         />
       )}
@@ -241,9 +316,21 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
                 <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
-              {isFullscreen ? <Minimize /> : <Maximize />}
-            </Button>
+            <div className="flex items-center gap-2">
+                {isHost && (
+                    <>
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot}>
+                            <Camera />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording}>
+                            {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
+                        </Button>
+                    </>
+                )}
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
+                {isFullscreen ? <Minimize /> : <Maximize />}
+                </Button>
+            </div>
           </div>
         </div>
       )}
@@ -260,3 +347,5 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     </Card>
   );
 }
+
+    
