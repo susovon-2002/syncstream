@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '../ui/label';
 import { Film, Link as LinkIcon, Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
+import { useState } from 'react';
 
 interface AddMediaTabsProps {
   onUrlSelect: (url: string, title: string, source: 'youtube' | 'file') => void;
@@ -26,6 +27,7 @@ function SubmitButton() {
 }
 
 export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
+  const [url, setUrl] = useState('');
   const initialState = { success: false, message: '', preview: undefined };
   const [state, formAction] = useActionState(generatePreviewAction, initialState);
 
@@ -36,6 +38,10 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
     return youtubeRegex.test(url);
   }
 
+  const isDirectMediaUrl = (url: string) => {
+    return /\.(mp4|webm|mkv|mp3|ogg|wav)$/i.test(url);
+  }
+
   const handleWatch = () => {
     if (!state.preview?.imageUrl) return;
     const url = state.preview.imageUrl;
@@ -43,6 +49,16 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
     const source = isYoutubeUrl(url) ? 'youtube' : 'file';
     onUrlSelect(url, title, source);
   };
+  
+  const handleFormSubmit = (formData: FormData) => {
+    const url = formData.get('url') as string;
+    if (isDirectMediaUrl(url)) {
+        const title = url.split('/').pop() || 'Direct Media';
+        onUrlSelect(url, title, 'file');
+    } else {
+        formAction(formData);
+    }
+  }
 
   return (
     <Tabs defaultValue="url" className="w-full">
@@ -58,8 +74,8 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {!canWatch ? (
-              <form action={formAction} className="space-y-4">
-                <Input name="url" placeholder="https://example.com/video.mp4" required />
+              <form action={handleFormSubmit} className="space-y-4">
+                <Input name="url" placeholder="https://example.com/video.mp4" required onChange={(e) => setUrl(e.target.value)} value={url} />
                 <SubmitButton />
                 {state.message && !state.success && <p className="text-sm text-destructive">{state.message}</p>}
               </form>
