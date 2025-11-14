@@ -52,7 +52,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   // Sync client player to Firebase state
   useEffect(() => {
     const video = playerRef.current;
-    if (!video || !roomState?.playback || seekingRef.current || !isReady) return;
+    if (!video || !roomState?.playback || !roomState.playback.lastUpdated || seekingRef.current || !isReady) return;
 
     // Sync playing state
     if (video.props.playing !== isPlaying) {
