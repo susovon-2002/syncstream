@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Clapperboard } from 'lucide-react';
 
 export function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="bg-card/20 text-foreground/80 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
       <div className="container mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
@@ -40,6 +42,9 @@ export function Footer() {
       </div>
       <div className="container mx-auto text-center mt-10 border-t border-border/50 pt-6">
         <p className="text-sm text-foreground/60">
+            &copy; {currentYear} SyncStream. All Rights Reserved.
+        </p>
+        <p className="text-sm text-foreground/60 mt-2">
             Made with ❤️ in the India
         </p>
       </div>
