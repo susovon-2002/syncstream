@@ -5,15 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Video, VideoOff } from 'lucide-react';
+import { Crown, Send, Video, VideoOff } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { useFirebase } from '@/firebase';
-import { useCollection } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection, useDoc } from '@/firebase';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import { UserVideo } from './user-video';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
 
 export function ChatPanel({ roomId }: { roomId: string }) {
   const { firestore, user } = useFirebase();
@@ -21,12 +28,33 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
+  const { data: room, isLoading: loadingRoom } = useDoc(roomRef);
+
   const messagesRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'chatMessages'), [firestore, roomId]);
   const messagesQuery = useMemoFirebase(() => query(messagesRef, orderBy('timestamp', 'asc'), limit(50)), [messagesRef]);
   const { data: messages, isLoading: loadingMessages } = useCollection(messagesQuery);
   
   const roomUsersRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'roomUsers'), [firestore, roomId]);
   const { data: participants, isLoading: loadingParticipants } = useCollection(roomUsersRef);
+
+  const isHost = user && room ? room.hostId === user.uid : false;
+
+  const handleMakeHost = (newHostId: string) => {
+    if (!isHost || !user) return;
+    const oldHostId = user.uid;
+
+    const updatedMembers = {
+      ...room.members,
+      [newHostId]: 'host',
+      [oldHostId]: 'participant',
+    };
+
+    updateDocumentNonBlocking(roomRef, {
+      hostId: newHostId,
+      members: updatedMembers,
+    });
+  };
 
   const getUsername = (userId: string) => {
     const participant = participants?.find(p => p.uid === userId);
@@ -80,14 +108,31 @@ export function ChatPanel({ roomId }: { roomId: string }) {
             </div>
         )}
         
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-3 pt-2 overflow-x-auto">
           {!loadingParticipants && participants?.map((p) => (
-            <div key={p.id} className="flex flex-col items-center gap-1">
-              <Avatar>
-                <AvatarImage src={p.photoURL} />
-                <AvatarFallback>{p.displayName?.charAt(0) || 'A'}</AvatarFallback>
-              </Avatar>
-              <span className="text-xs text-muted-foreground">{p.uid === user?.uid ? 'You' : p.displayName}</span>
+            <div key={p.id} className="flex flex-col items-center gap-1 text-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild disabled={!isHost || p.uid === user?.uid}>
+                  <div className="relative cursor-pointer">
+                    <Avatar>
+                      <AvatarImage src={p.photoURL} />
+                      <AvatarFallback>{p.displayName?.charAt(0) || 'A'}</AvatarFallback>
+                    </Avatar>
+                    {room?.hostId === p.uid && (
+                      <div className="absolute -top-1 -right-1 bg-primary rounded-full p-0.5">
+                        <Crown className="h-3 w-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleMakeHost(p.uid)}>
+                    Make Host
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <span className="text-xs text-muted-foreground w-16 truncate">{p.uid === user?.uid ? 'You' : p.displayName}</span>
             </div>
           ))}
         </div>

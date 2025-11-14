@@ -30,7 +30,10 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   const roomRef = useMemoFirebase(() => firestore ? doc(firestore, 'rooms', id) : null, [firestore, id]);
   const [room, loadingRoom] = useDocumentData(roomRef);
 
-  const roomUsersRef = useMemoFirebase(() => roomRef && user ? collection(roomRef, 'roomUsers') : null, [roomRef, user]);
+  const roomUsersRef = useMemoFirebase(
+    () => (firestore && user && !isUserLoading) ? collection(roomRef, 'roomUsers') : null, 
+    [firestore, user, isUserLoading, roomRef]
+  );
   const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
 
   // Handle user joining/leaving room
@@ -47,9 +50,6 @@ export default function RoomPage({ params }: { params: { id: string } }) {
       // TODO: Add onDisconnect logic for presence
     }
   }, [user, firestore, id]);
-
-
-  const isHost = user && room ? room.hostId === user.uid : false;
 
   if (isUserLoading || loadingRoom || !user) {
     return (
@@ -75,7 +75,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
       </Header>
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 p-4 overflow-hidden">
         <div className="lg:col-span-1 h-full min-h-0">
-          <VideoPlayer roomId={id} isHost={isHost} />
+          <VideoPlayer roomId={id} />
         </div>
         <div className="lg:col-span-1 h-full min-h-0">
           <ChatPanel roomId={id} />

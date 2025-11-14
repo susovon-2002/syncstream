@@ -17,11 +17,10 @@ import { useMemoFirebase } from '@/firebase/provider';
 
 interface VideoPlayerProps {
   roomId: string;
-  isHost: boolean;
 }
 
-export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
-  const { firestore } = useFirebase();
+export function VideoPlayer({ roomId }: VideoPlayerProps) {
+  const { firestore, user } = useFirebase();
 
   // Component State
   const [localMedia, setLocalMedia] = useState<string | MediaStream | null>(null);
@@ -40,6 +39,9 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   // Firebase Room State
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
   const [roomState, loadingRoomState] = useDocumentData(roomRef);
+  
+  const isHost = user && roomState ? roomState.hostId === user.uid : false;
+  const isMember = user && roomState ? user.uid in roomState.members : false;
 
   const isScreenShare = roomState?.media?.source === 'screen';
   const mediaUrl = isScreenShare ? localMedia : roomState?.media?.url;
@@ -78,7 +80,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
 
 
   const updatePlaybackState = (state: any) => {
-    if (!roomRef || isScreenShare) return;
+    if (!roomRef || isScreenShare || !isMember) return;
     setDocumentNonBlocking(roomRef, {
         playback: {
           ...roomState?.playback,
@@ -126,8 +128,11 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
-     if (isHost && !seekingRef.current && !isScreenShare) {
-        updatePlaybackState({ progress: state.playedSeconds });
+     if (isMember && !seekingRef.current && !isScreenShare) {
+        // More frequent updates can be taxing, let's allow host to be the main source of truth
+        if (isHost) {
+          updatePlaybackState({ progress: state.playedSeconds });
+        }
     }
   };
 
@@ -196,8 +201,8 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
             width="100%"
             height="100%"
             onReady={() => setIsReady(true)}
-            onPlay={handlePlay}
-            onPause={handlePause}
+            onPlay={isMember ? handlePlay : undefined}
+            onPause={isMember ? handlePause : undefined}
             onProgress={handleProgress}
             onDuration={setDuration}
             progressInterval={1000}
@@ -214,19 +219,20 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
             <Slider
               value={[progress]}
               max={duration}
-              onValueChange={handleSeek}
+              onValueChange={isMember ? handleSeek : undefined}
               onPointerDown={() => seekingRef.current = true}
               onPointerUp={() => seekingRef.current = false}
-              className="w-full cursor-pointer"
+              className={isMember ? "cursor-pointer" : "cursor-default"}
+              disabled={!isMember}
             />
           </div>
           <div className="flex items-center justify-between text-white mt-2">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay}>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay} disabled={!isMember}>
                 {isPlaying ? <Pause /> : <Play />}
               </Button>
               <div className="flex items-center gap-2 w-32">
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleMuteToggle}>
+                <Button variant="ghost" size="icon" className="text-white hover-bg-white/10" onClick={handleMuteToggle}>
                   {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
                 </Button>
                 <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
