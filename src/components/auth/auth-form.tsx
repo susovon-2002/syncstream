@@ -16,9 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase } from '@/firebase';
-import { initiateEmailSignIn, initiateEmailSignUp } from '@/firebase/non-blocking-login';
+import { initiateEmailSignIn, initiateEmailSignUp, initiateGoogleSignIn } from '@/firebase/non-blocking-login';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { Separator } from '../ui/separator';
 
 const signUpSchema = z.object({
   email: z.string().email(),
@@ -57,6 +58,27 @@ export function AuthForm() {
   function onSignIn(values: z.infer<typeof signInSchema>) {
     initiateEmailSignIn(auth, values.email, values.password);
   }
+  
+  function onGoogleSignIn() {
+    initiateGoogleSignIn(auth);
+  }
+
+  const GoogleSignInButton = () => (
+    <div className="space-y-4">
+        <div className="relative">
+            <Separator />
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
+            <span className="bg-card px-2 text-sm text-muted-foreground">OR</span>
+            </div>
+        </div>
+        <Button variant="outline" className="w-full" onClick={onGoogleSignIn}>
+            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                <path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 109.8 512 0 402.2 0 256S109.8 0 244 0s244 109.8 244 256h-95.8c0-81.7-65.2-147.9-148.2-147.9-82.8 0-150.5 66.5-150.5 147.9s67.7 147.9 150.5 147.9c45.3 0 84.3-20.1 111.3-52.4h-111.3v-63.6h202.9v33.6z"></path>
+            </svg>
+            Sign in with Google
+        </Button>
+    </div>
+  )
 
   return (
     <Card className="w-full max-w-md">
@@ -72,7 +94,7 @@ export function AuthForm() {
             <CardTitle>Welcome Back</CardTitle>
             <CardDescription>Enter your credentials to access your account.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Form {...signInForm}>
               <form onSubmit={signInForm.handleSubmit(onSignIn)} className="space-y-4">
                 <FormField
@@ -106,6 +128,7 @@ export function AuthForm() {
                 </Button>
               </form>
             </Form>
+            <GoogleSignInButton />
           </CardContent>
         </TabsContent>
         <TabsContent value="signup">
@@ -113,7 +136,7 @@ export function AuthForm() {
             <CardTitle>Create an Account</CardTitle>
             <CardDescription>Enter your email and password to get started.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Form {...signUpForm}>
               <form onSubmit={signUpForm.handleSubmit(onSignUp)} className="space-y-4">
                 <FormField
@@ -147,6 +170,7 @@ export function AuthForm() {
                 </Button>
               </form>
             </Form>
+            <GoogleSignInButton />
           </CardContent>
         </TabsContent>
       </Tabs>
