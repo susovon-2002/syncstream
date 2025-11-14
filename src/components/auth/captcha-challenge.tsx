@@ -1,24 +1,57 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Check, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 
-const allImages = [
-  { id: 1, src: 'https://picsum.photos/seed/1/200/200', isCorrect: true, hint: 'traffic light' },
-  { id: 2, src: 'https://picsum.photos/seed/2/200/200', isCorrect: false, hint: 'bicycle' },
-  { id: 3, src: 'https://picsum.photos/seed/3/200/200', isCorrect: true, hint: 'traffic light' },
-  { id: 4, src: 'https://picsum.photos/seed/4/200/200', isCorrect: false, hint: 'bridge' },
-  { id: 5, src: 'https://picsum.photos/seed/5/200/200', isCorrect: true, hint: 'traffic light' },
-  { id: 6, src: 'https://picsum.photos/seed/6/200/200', isCorrect: false, hint: 'road' },
-  { id: 7, src: 'https://picsum.photos/seed/7/200/200', isCorrect: false, hint: 'car' },
-  { id: 8, src: 'https://picsum.photos/seed/8/200/200', isCorrect: true, hint: 'traffic light' },
-  { id: 9, src: 'https://picsum.photos/seed/9/200/200', isCorrect: false, hint: 'building' },
+const challenges = [
+  {
+    label: 'traffic lights',
+    images: [
+      { id: 1, src: 'https://picsum.photos/seed/1/200/200', hint: 'traffic light' },
+      { id: 2, src: 'https://picsum.photos/seed/2/200/200', hint: 'bicycle' },
+      { id: 3, src: 'https://picsum.photos/seed/3/200/200', hint: 'traffic light' },
+      { id: 4, src: 'https://picsum.photos/seed/4/200/200', hint: 'bridge' },
+      { id: 5, src: 'https://picsum.photos/seed/5/200/200', hint: 'traffic light' },
+      { id: 6, src: 'https://picsum.photos/seed/6/200/200', hint: 'road' },
+      { id: 7, src: 'https://picsum.photos/seed/7/200/200', hint: 'car' },
+      { id: 8, src: 'https://picsum.photos/seed/8/200/200', hint: 'traffic light' },
+      { id: 9, src: 'https://picsum.photos/seed/9/200/200', hint: 'building' },
+    ],
+  },
+  {
+    label: 'bicycles',
+    images: [
+      { id: 10, src: 'https://picsum.photos/seed/10/200/200', hint: 'tree' },
+      { id: 11, src: 'https://picsum.photos/seed/11/200/200', hint: 'bicycle' },
+      { id: 12, src: 'https://picsum.photos/seed/12/200/200', hint: 'car' },
+      { id: 13, src: 'https://picsum.photos/seed/13/200/200', hint: 'bicycle' },
+      { id: 14, src: 'https://picsum.photos/seed/14/200/200', hint: 'building' },
+      { id: 15, src: 'https://picsum.photos/seed/15/200/200', hint: 'road' },
+      { id: 16, src: 'https://picsum.photos/seed/16/200/200', hint: 'bicycle' },
+      { id: 17, src: 'https://picsum.photos/seed/17/200/200', hint: 'river' },
+      { id: 18, src: 'https://picsum.photos/seed/18/200/200', hint: 'bicycle' },
+    ],
+  },
+    {
+    label: 'bridges',
+    images: [
+      { id: 19, src: 'https://picsum.photos/seed/19/200/200', hint: 'bridge' },
+      { id: 20, src: 'https://picsum.photos/seed/20/200/200', hint: 'car' },
+      { id: 21, src: 'https://picsum.photos/seed/21/200/200', hint: 'mountain' },
+      { id: 22, src: 'https://picsum.photos/seed/22/200/200', hint: 'bridge' },
+      { id: 23, src: 'https://picsum.photos/seed/23/200/200', hint: 'road' },
+      { id: 24, src: 'https://picsum.photos/seed/24/200/200', hint: 'tree' },
+      { id: 25, src: 'https://picsum.photos/seed/25/200/200', hint: 'bridge' },
+      { id: 26, src: 'https://picsum.photos/seed/26/200/200', hint: 'river' },
+      { id: 27, src: 'https://picsum.photos/seed/27/200/200', hint: 'building' },
+    ],
+  },
 ];
 
-const shuffleArray = (array: typeof allImages) => {
+const shuffleArray = (array: any[]) => {
     let currentIndex = array.length, randomIndex;
     while (currentIndex !== 0) {
         randomIndex = Math.floor(Math.random() * currentIndex);
@@ -34,11 +67,20 @@ interface CaptchaChallengeProps {
 }
 
 export function CaptchaChallenge({ onVerified }: CaptchaChallengeProps) {
-  const [images, setImages] = useState(shuffleArray([...allImages]));
+  const [challenge, setChallenge] = useState(challenges[0]);
+  const [images, setImages] = useState(shuffleArray([...challenge.images]));
   const [selected, setSelected] = useState<number[]>([]);
   const [isVerified, setIsVerified] = useState(false);
   
-  const correctImageIds = allImages.filter(img => img.isCorrect).map(img => img.id);
+  const correctImageIds = useMemo(() => 
+    challenge.images.filter(img => img.hint === challenge.label).map(img => img.id),
+    [challenge]
+  );
+
+  useEffect(() => {
+    handleReset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     onVerified(isVerified);
@@ -63,7 +105,9 @@ export function CaptchaChallenge({ onVerified }: CaptchaChallengeProps) {
 
   const handleReset = () => {
     setSelected([]);
-    setImages(shuffleArray([...allImages]));
+    const randomChallenge = challenges[Math.floor(Math.random() * challenges.length)];
+    setChallenge(randomChallenge);
+    setImages(shuffleArray([...randomChallenge.images]));
     setIsVerified(false);
   }
 
@@ -80,7 +124,7 @@ export function CaptchaChallenge({ onVerified }: CaptchaChallengeProps) {
     <div className="p-4 border rounded-md bg-card">
       <div className="p-3 bg-primary text-primary-foreground rounded-t-md">
         <p className="text-sm">Select all images with</p>
-        <p className="text-2xl font-bold">traffic lights</p>
+        <p className="text-2xl font-bold">{challenge.label}</p>
       </div>
       <div className="grid grid-cols-3 gap-1 p-1 bg-primary/10">
         {images.map(image => (
