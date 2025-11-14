@@ -30,26 +30,23 @@ export function Footer() {
         <div>
           <h3 className="font-semibold text-foreground mb-4">Company</h3>
           <ul className="space-y-2">
-            <li><Link href="#" className="hover:text-primary transition-colors">About Us</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Careers</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Blog</Link></li>
+            <li><Link href="/about" className="hover:text-primary transition-colors">About Us</Link></li>
           </ul>
         </div>
 
         <div>
           <h3 className="font-semibold text-foreground mb-4">Resources</h3>
           <ul className="space-y-2">
-            <li><Link href="#" className="hover:text-primary transition-colors">Community</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Support</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Events</Link></li>
+            <li><Link href="/support" className="hover:text-primary transition-colors">Support</Link></li>
+            <li><Link href="/events" className="hover:text-primary transition-colors">Events</Link></li>
           </ul>
         </div>
         
         <div>
           <h3 className="font-semibold text-foreground mb-4">Legal</h3>
           <ul className="space-y-2">
-            <li><Link href="#" className="hover:text-primary transition-colors">Privacy Statement</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Terms of Use</Link></li>
+            <li><Link href="/privacy" className="hover:text-primary transition-colors">Privacy Statement</Link></li>
+            <li><Link href="/terms" className="hover:text-primary transition-colors">Terms of Use</Link></li>
           </ul>
         </div>
       </div>
