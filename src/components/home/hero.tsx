@@ -53,7 +53,7 @@ export function Hero() {
         SyncStream
       </h1>
       <p className="max-w-3xl text-lg text-muted-foreground md:text-xl">
-        WE LIVE IN A TWILIGHT WORLD.
+        Watch videos with friends in perfect sync. Create a private room, share a video link, and enjoy a shared viewing experience with live chat and video calls.
       </p>
       
       <Card className="w-full max-w-md bg-card/50 backdrop-blur-sm border-border/20">
