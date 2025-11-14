@@ -32,12 +32,12 @@ export default function AboutPage() {
           <div>
             <h2 className="text-2xl font-bold">What We Offer</h2>
             <ul className="list-disc pl-5 space-y-1 mt-2">
-                <li>🎬 **Watch Parties** — Enjoy movies and videos together in sync</li>
-                <li>🎵 **Music Rooms** — Listen to songs with friends</li>
-                <li>🎥 **Live Video/Voice Calls** — Connect instantly</li>
-                <li>🔒 **Privacy & Safety** — Your data stays protected</li>
-                <li>🔗 **Shareable Rooms** — Create and join rooms instantly</li>
-                <li>💬 **Live Chat** — Communicate in real time</li>
+                <li>🎬 <strong>Watch Parties</strong> — Enjoy movies and videos together in sync</li>
+                <li>🎵 <strong>Music Rooms</strong> — Listen to songs with friends</li>
+                <li>🎥 <strong>Live Video/Voice Calls</strong> — Connect instantly</li>
+                <li>🔒 <strong>Privacy & Safety</strong> — Your data stays protected</li>
+                <li>🔗 <strong>Shareable Rooms</strong> — Create and join rooms instantly</li>
+                <li>💬 <strong>Live Chat</strong> — Communicate in real time</li>
             </ul>
           </div>
 
