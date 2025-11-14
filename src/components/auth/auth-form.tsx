@@ -54,11 +54,15 @@ export function AuthForm() {
   });
 
   function onSignUp(values: z.infer<typeof signUpSchema>) {
-    initiateEmailSignUp(auth, values.email, values.password);
+    if (isVerified) {
+      initiateEmailSignUp(auth, values.email, values.password);
+    }
   }
 
   function onSignIn(values: z.infer<typeof signInSchema>) {
-    initiateEmailSignIn(auth, values.email, values.password);
+    if (isVerified) {
+      initiateEmailSignIn(auth, values.email, values.password);
+    }
   }
   
   function onGoogleSignIn() {
@@ -84,6 +88,42 @@ export function AuthForm() {
     </div>
   )
 
+  const EmailPasswordForm = ({ form, onSubmit, buttonText }: any) => (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" className="w-full" disabled={!isVerified}>
+            {buttonText}
+          </Button>
+        </form>
+      </Form>
+  )
+
   return (
     <Card className="w-full max-w-md">
       <Tabs defaultValue="signin">
@@ -99,40 +139,7 @@ export function AuthForm() {
             <CardDescription>Enter your credentials to access your account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Form {...signInForm}>
-              <form onSubmit={signInForm.handleSubmit(onSignIn)} className="space-y-4">
-                <FormField
-                  control={signInForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="name@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={signInForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <CaptchaChallenge onVerified={setIsVerified} />
-                <Button type="submit" className="w-full" disabled={!isVerified}>
-                  Sign In
-                </Button>
-              </form>
-            </Form>
+            <EmailPasswordForm form={signInForm} onSubmit={onSignIn} buttonText="Sign In" />
             <GoogleSignInButton />
           </CardContent>
         </TabsContent>
@@ -142,43 +149,13 @@ export function AuthForm() {
             <CardDescription>Enter your email and password to get started.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Form {...signUpForm}>
-              <form onSubmit={signUpForm.handleSubmit(onSignUp)} className="space-y-4">
-                <FormField
-                  control={signUpForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="name@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={signUpForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <CaptchaChallenge onVerified={setIsVerified} />
-                <Button type="submit" className="w-full" disabled={!isVerified}>
-                  Sign Up
-                </Button>
-              </form>
-            </Form>
+             <EmailPasswordForm form={signUpForm} onSubmit={onSignUp} buttonText="Sign Up" />
             <GoogleSignInButton />
           </CardContent>
         </TabsContent>
+         <CardContent>
+            <CaptchaChallenge onVerified={setIsVerified} />
+        </CardContent>
       </Tabs>
     </Card>
   );
