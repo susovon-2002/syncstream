@@ -139,7 +139,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ChatMessage",
       "type": "object",
-      "description": "Represents a chat message sent within a room.",
+      "description": "Represents a chat message sent within a room. It can contain text, and optionally, media.",
       "properties": {
         "id": {
           "type": "string",
@@ -161,6 +161,16 @@
           "type": "string",
           "description": "Timestamp indicating when the message was sent.",
           "format": "date-time"
+        },
+        "mediaUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the uploaded image or video. This is optional."
+        },
+        "mediaType": {
+            "type": "string",
+            "enum": ["image", "video"],
+            "description": "Type of the media, if any. This is optional."
         }
       },
       "required": [
@@ -277,3 +287,4 @@
     "reasoning": "The Firestore structure is designed to support SyncStream's real-time collaborative media viewing. It prioritizes authorization independence and clear security rules, crucial for collaborative applications.\n\nUsers are stored in a standard `/users/{userId}` collection. Rooms are also top-level collections, enabling easy listing. The `RoomUser` entity is used for tracking room participation and presence.  Media and ChatMessages are stored as subcollections of rooms to scope the data.\n\n**Authorization Independence:**\n*   `rooms`:  Authorization is managed through the `hostId` property within each room.  A user can only modify or delete a room where they are the host.\n*   `rooms/{roomId}/media`: Access to media is determined by membership in the room. Security rules will validate if `request.auth.uid` exists as a member in the `members` map denormalized inside the room document before creating or modifying media.\n*   `rooms/{roomId}/chatMessages`: Similar to media, access to chat messages is controlled by room membership.\n\n**QAPs (Rules are not Filters):**\n*   The segregation of data into `/users` and `/rooms` collections allows for simple `list` operations based on ownership or membership.\n\n**Denormalization Strategy:**\n*   The `rooms` collection does not contain `members` subcollections but will have an attribute `members` of type map in each document. This ensures that when we need to query, modify, or delete objects in the `/rooms/{roomId}/media` collection we are not required to make a `get()` call to the parent to check the access.\n*   When a user creates a room, their `uid` will be added to the `members` map."
   }
 }
+    
