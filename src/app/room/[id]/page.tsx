@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, use, useState } from 'react';
@@ -110,20 +111,18 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           <RoomIdDisplay roomId={id} />
         </div>
       </Header>
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 p-4 overflow-hidden">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-4 p-4 overflow-hidden">
         <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-4">
-            {videoParticipants && videoParticipants.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {videoParticipants.map(p => (
-                        <UserVideo key={p.id} user={p} isLocalUser={p.uid === user?.uid} />
-                    ))}
-                </div>
-            )}
-            <div className="flex-1 min-h-0">
-                <VideoPlayer roomId={id} />
-            </div>
+            <VideoPlayer roomId={id} />
         </div>
-        <div className="lg:col-span-1 h-full min-h-0">
+        <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-4 overflow-y-auto">
+          {videoParticipants && videoParticipants.length > 0 && (
+              <div className="grid grid-cols-1 gap-4">
+                  {videoParticipants.map(p => (
+                      <UserVideo key={p.id} user={p} isLocalUser={p.uid === user?.uid} />
+                  ))}
+              </div>
+          )}
           <ChatPanel roomId={id} />
         </div>
       </main>
