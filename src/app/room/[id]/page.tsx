@@ -16,6 +16,7 @@ import { useMemoFirebase } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { UserVideo } from '@/components/room/user-video';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { id } = use(params);
@@ -68,6 +69,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
     };
   }, [user, firestore, id]);
 
+  const videoParticipants = roomUsers?.filter(p => p.isCameraOn);
 
   if (isUserLoading || loadingRoom || !user) {
     return (
@@ -109,8 +111,17 @@ export default function RoomPage({ params }: { params: { id: string } }) {
         </div>
       </Header>
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 p-4 overflow-hidden">
-        <div className="lg:col-span-1 h-full min-h-0">
-          <VideoPlayer roomId={id} />
+        <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-4">
+            {videoParticipants && videoParticipants.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {videoParticipants.map(p => (
+                        <UserVideo key={p.id} user={p} isLocalUser={p.uid === user?.uid} />
+                    ))}
+                </div>
+            )}
+            <div className="flex-1 min-h-0">
+                <VideoPlayer roomId={id} />
+            </div>
         </div>
         <div className="lg:col-span-1 h-full min-h-0">
           <ChatPanel roomId={id} />

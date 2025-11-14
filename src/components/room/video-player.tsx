@@ -191,6 +191,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     if (isRecording) {
       // Stop recording
       mediaRecorderRef.current?.stop();
+      setIsRecording(false);
     } else {
       // Start recording
       if (!playerRef.current) return;
@@ -347,5 +348,3 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     </Card>
   );
 }
-
-    

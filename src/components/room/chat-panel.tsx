@@ -13,7 +13,6 @@ import { useCollection, useDoc } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, limit, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
-import { UserVideo } from './user-video';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +63,10 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const getUsername = (userId: string) => {
     const participant = participants?.find(p => p.uid === userId);
     const displayName = participant?.displayName || 'Anonymous';
-    return displayName.split(' ')[0];
+    if (displayName.includes(' ')) {
+      return displayName.split(' ')[0];
+    }
+    return displayName;
   }
   
   const getUserAvatar = (userId: string) => {
@@ -142,8 +144,6 @@ export function ChatPanel({ roomId }: { roomId: string }) {
       }
   };
 
-  const videoParticipants = participants?.filter(p => p.isCameraOn);
-
   return (
     <Card className="h-full flex flex-col bg-card/80">
       <CardHeader>
@@ -154,14 +154,6 @@ export function ChatPanel({ roomId }: { roomId: string }) {
             </Button>
         </div>
       </CardHeader>
-      
-      {videoParticipants && videoParticipants.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 p-2">
-            {videoParticipants.map(p => (
-                <UserVideo key={p.id} user={p} isLocalUser={p.uid === user?.uid} />
-            ))}
-        </div>
-      )}
       
       <div className="flex items-center gap-3 p-2 overflow-x-auto border-t">
         {!loadingParticipants && participants?.map((p) => (
