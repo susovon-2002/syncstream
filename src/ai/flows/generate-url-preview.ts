@@ -83,7 +83,12 @@ const generateUrlPreviewFlow = ai.defineFlow(
   async input => {
     const {output} = await generateUrlPreviewPrompt(input);
     if (!output) {
-      throw new Error("The AI model failed to return a valid response.");
+      return {
+        title: '',
+        description: '',
+        imageUrl: '',
+        error: 'The AI model failed to return a valid response. The URL may be inaccessible or unsupported.',
+      };
     }
     return output;
   }
