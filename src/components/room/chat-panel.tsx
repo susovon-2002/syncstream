@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send } from 'lucide-react';
+import { Send, Video, VideoOff } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { useFirebase } from '@/firebase';
@@ -13,10 +13,12 @@ import { useCollection } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
+import { UserVideo } from './user-video';
 
 export function ChatPanel({ roomId }: { roomId: string }) {
   const { firestore, user } = useFirebase();
   const [newMessage, setNewMessage] = useState('');
+  const [isCameraOn, setIsCameraOn] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const messagesRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'chatMessages'), [firestore, roomId]);
@@ -58,10 +60,26 @@ export function ChatPanel({ roomId }: { roomId: string }) {
     }
   }, [messages]);
 
+  const toggleCamera = () => {
+    setIsCameraOn(prev => !prev);
+  }
+
   return (
     <Card className="h-full flex flex-col bg-card/80">
       <CardHeader>
-        <CardTitle className="text-lg">Participants</CardTitle>
+        <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">Participants</CardTitle>
+            <Button variant="ghost" size="icon" onClick={toggleCamera}>
+                {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+            </Button>
+        </div>
+
+        {isCameraOn && user && (
+            <div className="pt-2">
+                <UserVideo user={user} />
+            </div>
+        )}
+        
         <div className="flex items-center gap-3 pt-2">
           {!loadingParticipants && participants?.map((p) => (
             <div key={p.id} className="flex flex-col items-center gap-1">
