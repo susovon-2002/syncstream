@@ -62,10 +62,14 @@ const generateUrlPreviewPrompt = ai.definePrompt({
   
   URL: {{{url}}}
   
-  Use the 'fetchUrlContent' tool to get the content of the page. From that content, you will extract the title, a short description, and an image URL representing the content of the page.
+  Use the 'fetchUrlContent' tool to get the content of the page. 
+  
+  If the tool returns an error message in its content (e.g., "Error: ..."), you MUST stop and set the 'error' field in your output to that exact error message. Do not proceed with summarization.
+
+  If the tool returns content successfully, you will extract the title, a short description, and an image URL representing the content of the page.
   
   - The image URL MUST be an absolute URL. If you find a relative path (e.g., /images/foo.png), you must convert it to an absolute URL based on the original URL provided.
-  - If you cannot access the URL, or if the content is not HTML, or if you cannot extract the required information for any reason, you MUST set the 'error' field in the output with a descriptive message explaining the issue. Do not try to make up information.
+  - If you cannot extract the required information for any reason (e.g., the content is not HTML), you MUST set the 'error' field in the output with a descriptive message explaining the issue. Do not try to make up information.
 
   Output the title, description, and imageUrl in the JSON format specified in the output schema.`,
 });
@@ -78,6 +82,9 @@ const generateUrlPreviewFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await generateUrlPreviewPrompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("The AI model failed to return a valid response.");
+    }
+    return output;
   }
 );

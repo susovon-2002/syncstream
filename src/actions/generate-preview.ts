@@ -41,11 +41,12 @@ export async function generatePreviewAction(
       message: 'Preview generated successfully.',
       preview,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    const message = error.message || 'Failed to generate preview. The URL might not be accessible or supported.';
     return {
       success: false,
-      message: 'Failed to generate preview. The URL might not be accessible or supported.',
+      message,
     };
   }
 }
