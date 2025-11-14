@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, use } from 'react';
-import { doc, collection } from 'firebase/firestore';
+import { useEffect, use, useState } from 'react';
+import { doc, collection, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { useFirebase } from '@/firebase';
 
@@ -38,7 +38,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   );
   const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
 
-  // Handle user joining/leaving room
+  // Handle user joining room
   useEffect(() => {
     if (user && firestore && id) {
       const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
@@ -47,11 +47,27 @@ export default function RoomPage({ params }: { params: { id: string } }) {
         displayName: user.displayName || user.email || 'Anonymous',
         photoURL: user.photoURL,
         joinedAt: new Date(),
+        isCameraOn: false,
       }, { merge: true });
-
-      // TODO: Add onDisconnect logic for presence
     }
   }, [user, firestore, id]);
+
+  // Handle user leaving room (presence)
+  useEffect(() => {
+    if (!user || !firestore || !id) return;
+
+    const handleBeforeUnload = () => {
+      const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
+      updateDoc(userRef, { isCameraOn: false }); // Turn off camera on leaving
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [user, firestore, id]);
+
 
   if (isUserLoading || loadingRoom || !user) {
     return (

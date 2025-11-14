@@ -11,7 +11,7 @@ import { Separator } from '../ui/separator';
 import { useFirebase } from '@/firebase';
 import { useCollection, useDoc } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import { UserVideo } from './user-video';
 import {
@@ -109,9 +109,22 @@ export function ChatPanel({ roomId }: { roomId: string }) {
     }
   }, [messages]);
 
-  const toggleCamera = () => {
-    setIsCameraOn(prev => !prev);
+ const toggleCamera = async () => {
+    if (!user || !firestore) return;
+    const userRef = doc(firestore, 'rooms', roomId, 'roomUsers', user.uid);
+    const newCameraState = !isCameraOn;
+    setIsCameraOn(newCameraState);
+    await updateDoc(userRef, { isCameraOn: newCameraState });
   }
+
+  useEffect(() => {
+    if(user && participants) {
+        const currentUser = participants.find(p => p.uid === user.uid);
+        if (currentUser) {
+            setIsCameraOn(currentUser.isCameraOn);
+        }
+    }
+  }, [user, participants]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -129,6 +142,8 @@ export function ChatPanel({ roomId }: { roomId: string }) {
       }
   };
 
+  const videoParticipants = participants?.filter(p => p.isCameraOn);
+
   return (
     <Card className="h-full flex flex-col bg-card/80">
       <CardHeader>
@@ -138,42 +153,44 @@ export function ChatPanel({ roomId }: { roomId: string }) {
                 {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
             </Button>
         </div>
-
-        {isCameraOn && user && (
-            <div className="pt-2">
-                <UserVideo user={user} />
-            </div>
-        )}
-        
-        <div className="flex items-center gap-3 pt-2 overflow-x-auto">
-          {!loadingParticipants && participants?.map((p) => (
-            <div key={p.id} className="flex flex-col items-center gap-1 text-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild disabled={!isHost || p.uid === user?.uid}>
-                  <div className="relative cursor-pointer">
-                    <Avatar>
-                      <AvatarImage src={p.photoURL} />
-                      <AvatarFallback>{p.displayName?.charAt(0) || 'A'}</AvatarFallback>
-                    </Avatar>
-                    {room?.hostId === p.uid && (
-                      <div className="absolute -top-1 -right-1 bg-primary rounded-full p-0.5">
-                        <Crown className="h-3 w-3 text-primary-foreground" />
-                      </div>
-                    )}
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleMakeHost(p.uid)}>
-                    Make Host
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <span className="text-xs text-muted-foreground w-16 truncate">{p.uid === user?.uid ? 'You' : p.displayName}</span>
-            </div>
-          ))}
-        </div>
       </CardHeader>
+      
+      {videoParticipants && videoParticipants.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 p-2">
+            {videoParticipants.map(p => (
+                <UserVideo key={p.id} user={p} isLocalUser={p.uid === user?.uid} />
+            ))}
+        </div>
+      )}
+      
+      <div className="flex items-center gap-3 p-2 overflow-x-auto border-t">
+        {!loadingParticipants && participants?.map((p) => (
+          <div key={p.id} className="flex flex-col items-center gap-1 text-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={!isHost || p.uid === user?.uid}>
+                <div className="relative cursor-pointer">
+                  <Avatar>
+                    <AvatarImage src={p.photoURL} />
+                    <AvatarFallback>{p.displayName?.charAt(0) || 'A'}</AvatarFallback>
+                  </Avatar>
+                  {room?.hostId === p.uid && (
+                    <div className="absolute -top-1 -right-1 bg-primary rounded-full p-0.5">
+                      <Crown className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleMakeHost(p.uid)}>
+                  Make Host
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <span className="text-xs text-muted-foreground w-16 truncate">{p.uid === user?.uid ? 'You' : getUsername(p.uid)}</span>
+          </div>
+        ))}
+      </div>
       <Separator />
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <div className="p-4">
