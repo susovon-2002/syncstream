@@ -14,6 +14,8 @@ import { useCollection } from '@/firebase';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useMemoFirebase } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { id } = use(params);
@@ -69,6 +71,23 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-muted-foreground" />
             <span className="font-semibold">{roomUsers?.length || 1}</span>
+            <div className="flex -space-x-2 ml-2">
+              <TooltipProvider>
+                {roomUsers?.map((u) => (
+                  <Tooltip key={u.id}>
+                    <TooltipTrigger>
+                      <Avatar className="h-7 w-7 border-2 border-background">
+                        <AvatarImage src={u.photoURL} />
+                        <AvatarFallback>{u.displayName?.charAt(0) || 'A'}</AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{u.displayName}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </TooltipProvider>
+            </div>
           </div>
           <RoomIdDisplay roomId={id} />
         </div>
