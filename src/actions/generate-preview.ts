@@ -30,6 +30,12 @@ export async function generatePreviewAction(
   
   try {
     const preview = await generateUrlPreview(validatedFields.data);
+    if (preview.error) {
+      return {
+        success: false,
+        message: preview.error,
+      };
+    }
     return {
       success: true,
       message: 'Preview generated successfully.',

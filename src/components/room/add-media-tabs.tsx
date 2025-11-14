@@ -29,6 +29,8 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const initialState = { success: false, message: '', preview: undefined };
   const [state, formAction] = useActionState(generatePreviewAction, initialState);
 
+  const canWatch = state.success && state.preview && !state.preview.error;
+
   return (
     <Tabs defaultValue="url" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
@@ -42,7 +44,7 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
             <CardDescription>Enter a video or audio URL to start watching.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!state.preview ? (
+            {!canWatch ? (
               <form action={formAction} className="space-y-4">
                 <Input name="url" placeholder="https://example.com/video.mp4" required />
                 <SubmitButton />
@@ -53,11 +55,11 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
                 <Card>
                   <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
                     <div className="relative w-full md:w-32 h-24 md:h-full rounded-md overflow-hidden shrink-0">
-                      <Image src={state.preview.imageUrl} alt={state.preview.title} fill className="object-cover" />
+                      <Image src={state.preview!.imageUrl} alt={state.preview!.title} fill className="object-cover" />
                     </div>
                     <div className="space-y-1 text-left">
-                      <h3 className="font-semibold line-clamp-1">{state.preview.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{state.preview.description}</p>
+                      <h3 className="font-semibold line-clamp-1">{state.preview!.title}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{state.preview!.description}</p>
                     </div>
                   </CardContent>
                 </Card>

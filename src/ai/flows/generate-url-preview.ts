@@ -20,6 +20,7 @@ const GenerateUrlPreviewOutputSchema = z.object({
   title: z.string().describe('The title of the URL content.'),
   description: z.string().describe('A brief description of the URL content.'),
   imageUrl: z.string().url().describe('The URL of an image representing the content.'),
+  error: z.string().optional().describe('An error message if the preview could not be generated.'),
 });
 export type GenerateUrlPreviewOutput = z.infer<typeof GenerateUrlPreviewOutputSchema>;
 
@@ -36,6 +37,8 @@ const generateUrlPreviewPrompt = ai.definePrompt({
 URL: {{{url}}}
 
 Ensure that the image URL is a direct link to the image and not a relative path.
+
+If you cannot access the URL or extract the required information, set the 'error' field in the output with a descriptive message explaining the issue.
 
 Output the title, description, and imageUrl in the JSON format specified in the output schema.`,
 });
