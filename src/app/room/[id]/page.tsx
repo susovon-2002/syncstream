@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, use } from 'react';
 import { doc, collection } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { useFirebase } from '@/firebase';
@@ -16,7 +16,7 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useMemoFirebase } from '@/firebase/provider';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const { id } = use(params);
   const { auth, firestore, user } = useFirebase();
 
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', id), [firestore, id]);
