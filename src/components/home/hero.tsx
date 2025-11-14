@@ -49,14 +49,14 @@ export function Hero() {
 
   return (
     <div className="container mx-auto flex flex-col items-center justify-center gap-8 py-10 md:py-20 text-center">
-      <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl font-headline bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-400 to-accent">
-        Watch. Chat. Together.
+      <h1 className="text-5xl font-extrabold tracking-tight md:text-7xl lg:text-8xl font-headline uppercase">
+        SyncStream
       </h1>
       <p className="max-w-3xl text-lg text-muted-foreground md:text-xl">
-        Create a room, share the link, and enjoy videos or music with your friends in perfect sync. Your private watch party awaits.
+        WE LIVE IN A TWILIGHT WORLD.
       </p>
       
-      <Card className="w-full max-w-md bg-card/50 backdrop-blur-sm border-primary/20">
+      <Card className="w-full max-w-md bg-card/50 backdrop-blur-sm border-border/20">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Get Started</CardTitle>
           <CardDescription>Create a new room or join an existing one.</CardDescription>
@@ -64,8 +64,8 @@ export function Hero() {
         <CardContent className="space-y-4">
           {user ? (
             <>
-              <Button size="lg" className="w-full font-bold text-lg" onClick={handleCreateRoom}>
-                <PartyPopper className="mr-2" /> Create a New Room
+              <Button size="lg" className="w-full font-bold text-lg uppercase tracking-wider" onClick={handleCreateRoom}>
+                <PartyPopper className="mr-2" /> Create Room
               </Button>
 
               <div className="flex items-center gap-4">
@@ -77,10 +77,10 @@ export function Hero() {
               <form onSubmit={handleJoinRoom} className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Enter Room ID..."
+                  placeholder="ENTER ROOM ID"
                   value={roomId}
                   onChange={(e) => setRoomId(e.target.value)}
-                  className="font-code text-center tracking-widest"
+                  className="font-code text-center tracking-widest placeholder:text-muted-foreground/50"
                   aria-label="Room ID to join"
                 />
                 <Button type="submit" size="icon" variant="secondary" aria-label="Join Room">
