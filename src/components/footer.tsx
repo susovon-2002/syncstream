@@ -55,7 +55,7 @@ export function Footer() {
       </div>
       <div className="container mx-auto text-center mt-10 border-t border-border/50 pt-6">
         <p className="text-sm text-foreground/60">
-            Made with ❤️ in the Cloud
+            Made with ❤️ in the India
         </p>
       </div>
     </footer>
