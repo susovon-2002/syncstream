@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { doc } from 'firebase/firestore';
+import { doc, collection } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { useFirebase } from '@/firebase';
 
@@ -16,9 +16,10 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useMemoFirebase } from '@/firebase/provider';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { auth, firestore, user } = useFirebase();
 
-  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', params.id), [firestore, params.id]);
+  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', id), [firestore, id]);
   const [room, loadingRoom] = useDocumentData(roomRef);
 
   const roomUsersRef = useMemoFirebase(() => roomRef && collection(roomRef, 'roomUsers'), [roomRef]);
@@ -33,8 +34,8 @@ export default function RoomPage({ params }: { params: { id: string } }) {
 
   // Handle user joining/leaving room
   useEffect(() => {
-    if (user && firestore && params.id) {
-      const userRef = doc(firestore, 'rooms', params.id, 'roomUsers', user.uid);
+    if (user && firestore && id) {
+      const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
       setDocumentNonBlocking(userRef, {
         uid: user.uid,
         displayName: user.displayName || 'Anonymous',
@@ -44,7 +45,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
 
       // TODO: Add onDisconnect logic for presence
     }
-  }, [user, firestore, params.id]);
+  }, [user, firestore, id]);
 
 
   const isHost = user && room ? room.hostId === user.uid : false;
@@ -57,15 +58,15 @@ export default function RoomPage({ params }: { params: { id: string } }) {
             <Users className="h-5 w-5 text-muted-foreground" />
             <span className="font-semibold">{roomUsers?.length || 1}</span>
           </div>
-          <RoomIdDisplay roomId={params.id} />
+          <RoomIdDisplay roomId={id} />
         </div>
       </Header>
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 overflow-hidden">
         <div className="lg:col-span-3 h-full min-h-0">
-          <VideoPlayer roomId={params.id} isHost={isHost} />
+          <VideoPlayer roomId={id} isHost={isHost} />
         </div>
         <div className="lg:col-span-1 h-full min-h-0">
-          <ChatPanel roomId={params.id} />
+          <ChatPanel roomId={id} />
         </div>
       </main>
     </div>
