@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Clapperboard, Facebook, Instagram, Linkedin, Send, Twitter, Youtube } from 'lucide-react';
+import { Clapperboard } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -14,17 +14,6 @@ export function Footer() {
                 <p className='font-semibold'>Contact Us</p>
                 <p>susovonsantra4@gmail.com</p>
             </div>
-            <div className='mt-4 space-y-2 text-sm'>
-                <p className='font-semibold'>Follow Us</p>
-                <div className='flex space-x-4 mt-2'>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Facebook size={20}/></Link>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Instagram size={20}/></Link>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Twitter size={20}/></Link>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Linkedin size={20}/></Link>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Youtube size={20}/></Link>
-                    <Link href="#" className="text-foreground/60 hover:text-primary"><Send size={20}/></Link>
-                </div>
-            </div>
         </div>
 
         <div>
@@ -38,7 +27,6 @@ export function Footer() {
           <h3 className="font-semibold text-foreground mb-4">Resources</h3>
           <ul className="space-y-2">
             <li><Link href="/support" className="hover:text-primary transition-colors">Support</Link></li>
-            <li><Link href="/events" className="hover:text-primary transition-colors">Events</Link></li>
           </ul>
         </div>
         
