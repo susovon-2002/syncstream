@@ -49,13 +49,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to rooms. The host of a room can update and delete it.  Members of the room can read it.
+     * @description Controls access to rooms. The host of a room can delete it. Members of the room can read and update it.
      * @path /rooms/{roomId}
      * @allow (get, list) - Any authenticated user can read room details.
      * @allow (create) - Any authenticated user can create a new room.
-     * @allow (update, delete) - Only the host of the room can update or delete it.
-     * @deny (update, delete) - Non-host user attempts to update or delete the room.
-     * @principle Enforces host-based ownership for room management.
+     * @allow (update) - Any member of the room can update it.
+     * @allow (delete) - Only the host of the room can delete it.
+     * @deny (update) - Non-member user attempts to update the room.
+     * @deny (delete) - Non-host user attempts to delete the room.
+     * @principle Enforces host-based ownership for deletion and member-based for updates.
      */
     match /rooms/{roomId} {
       function isHost() {
@@ -66,10 +68,14 @@ service cloud.firestore {
         return request.auth != null;
       }
 
+      function isMember() {
+          return request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.members;
+      }
+
       allow get: if isSignedIn();
       allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && isHost();
+      allow update: if isSignedIn() && isMember();
       allow delete: if isSignedIn() && isHost();
     }
 

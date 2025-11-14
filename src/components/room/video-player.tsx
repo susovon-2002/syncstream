@@ -78,7 +78,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
 
 
   const updatePlaybackState = (state: any) => {
-    if (!isHost || !roomRef || isScreenShare) return;
+    if (!roomRef || isScreenShare) return;
     setDocumentNonBlocking(roomRef, {
         playback: {
           ...roomState?.playback,
@@ -121,8 +121,8 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
     }
   };
 
-  const handlePlay = () => isHost && updatePlaybackState({ isPlaying: true });
-  const handlePause = () => isHost && updatePlaybackState({ isPlaying: false });
+  const handlePlay = () => updatePlaybackState({ isPlaying: true });
+  const handlePause = () => updatePlaybackState({ isPlaying: false });
   
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
@@ -134,9 +134,9 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
   const handleSeek = (value: number[]) => {
     const newTime = value[0];
     setProgress(newTime);
-    if(isHost && !isScreenShare) {
-        if(playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
-        updatePlaybackState({ progress: newTime });
+    if (!isScreenShare) {
+      if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+      updatePlaybackState({ progress: newTime });
     }
   };
 
@@ -218,16 +218,13 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
               onPointerDown={() => seekingRef.current = true}
               onPointerUp={() => seekingRef.current = false}
               className="w-full cursor-pointer"
-              disabled={!isHost}
             />
           </div>
           <div className="flex items-center justify-between text-white mt-2">
             <div className="flex items-center gap-4">
-              {isHost && (
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay}>
-                  {isPlaying ? <Pause /> : <Play />}
-                </Button>
-              )}
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay}>
+                {isPlaying ? <Pause /> : <Play />}
+              </Button>
               <div className="flex items-center gap-2 w-32">
                 <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleMuteToggle}>
                   {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
