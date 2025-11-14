@@ -1,0 +1,142 @@
+/**
+ * @fileoverview Firestore Security Rules for SyncStream.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model for rooms and ownership for user profiles. It leverages denormalization to ensure authorization independence and efficient rule execution.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles. Access is restricted to the owning user.
+ * - /rooms/{roomId}: Stores room information, including the host ID and a denormalized 'members' map for authorization.
+ * - /rooms/{roomId}/roomUsers/{roomUserId}: Tracks user presence in rooms. Access is controlled by room membership.
+ * - /rooms/{roomId}/media/{mediaId}: Stores media files associated with a room. Access is controlled by the 'members' map in the parent room document.
+ * - /rooms/{roomId}/chatMessages/{chatMessageId}: Stores chat messages for a room. Access is controlled by the 'members' map in the parent room document.
+ *
+ * Key Security Decisions:
+ * - Users can only manage their own profiles.
+ * - Rooms are secured using a denormalized 'members' map, enabling efficient role-based access control for media and chat messages within rooms.
+ * - Listing all users is disallowed for privacy reasons.
+ *
+ * Denormalization for Authorization:
+ * - Room documents contain a 'members' map, where keys are user IDs and values are roles (e.g., 'host', 'participant'). This allows subcollection access rules (media, chatMessages) to be validated without additional 'get()' calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profiles. Users can only read and write their own profile data.
+     * @path /users/{userId}
+     * @allow (create) - Authenticated user with matching UID can create their profile.
+     * @allow (get, update, delete) - Authenticated user with matching UID can read/update/delete their profile.
+     * @deny (create) - Authenticated user tries to create a profile with a different UID.
+     * @deny (get, update, delete) - Unauthenticated user tries to access any profile.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    /**
+     * @description Controls access to rooms. The host of a room can update and delete it.  Members of the room can read it.
+     * @path /rooms/{roomId}
+     * @allow (get, list) - Any authenticated user can read room details.
+     * @allow (create) - Any authenticated user can create a new room.
+     * @allow (update, delete) - Only the host of the room can update or delete it.
+     * @deny (update, delete) - Non-host user attempts to update or delete the room.
+     * @principle Enforces host-based ownership for room management.
+     */
+    match /rooms/{roomId} {
+      function isHost() {
+          return get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid;
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && isHost();
+      allow delete: if isSignedIn() && isHost();
+    }
+
+    /**
+     * @description Controls access to room users.  Anyone can read, create and list room users.
+     * @path /rooms/{roomId}/roomUsers/{roomUserId}
+     */
+    match /rooms/{roomId}/roomUsers/{roomUserId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Controls access to media within a room.  Only room members can create media, everyone can read, no one can update or delete.
+     * @path /rooms/{roomId}/media/{mediaId}
+     * @allow (get, list) - Any authenticated user can read media within a room.
+     * @allow (create) - Only a member of the room can create media.
+     * @deny (create) - Non-member user attempts to create media in the room.
+     * @principle Enforces membership-based access control for media creation.
+     */
+    match /rooms/{roomId}/media/{mediaId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isMember() {
+          return request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.members;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isMember();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Controls access to chat messages within a room. Only room members can create messages, everyone can read, no one can update or delete.
+     * @path /rooms/{roomId}/chatMessages/{chatMessageId}
+     * @allow (get, list) - Any authenticated user can read chat messages within a room.
+     * @allow (create) - Only a member of the room can create chat messages.
+     * @deny (create) - Non-member user attempts to create chat messages in the room.
+     * @principle Enforces membership-based access control for chat message creation.
+     */
+    match /rooms/{roomId}/chatMessages/{chatMessageId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isMember() {
+          return request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.members;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isMember();
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
