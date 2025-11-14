@@ -60,6 +60,8 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
       // Handled by ReactPlayer's `playing` prop
     }
     
+    if(!roomState.playback.lastUpdated) return;
+
     const serverTime = roomState.playback.lastUpdated.toDate().getTime();
     const clientTime = new Date().getTime();
     const timeDiff = (clientTime - serverTime) / 1000;
@@ -226,9 +228,9 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
         />
       )}
 
-      {(mediaUrl || isScreenSharing) && isReady && (
+      {(mediaUrl || isScreenSharing || isHost) && (
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          {!isScreenSharing && (
+          {(mediaUrl && !isScreenSharing) && (
             <div className="flex flex-col gap-2">
               <Slider
                 value={[progress]}
@@ -243,7 +245,7 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
           )}
           <div className="flex items-center justify-between text-white mt-2">
             <div className="flex items-center gap-4">
-              {isHost && !isScreenSharing && (
+              {isHost && mediaUrl && !isScreenSharing && (
                 <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay}>
                   {isPlaying ? <Pause /> : <Play />}
                 </Button>
@@ -253,21 +255,27 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
                   {isScreenSharing ? <ScreenShareOff /> : <ScreenShare />}
                 </Button>
               )}
-              <div className="flex items-center gap-2 w-32">
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleMuteToggle}>
-                  {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
-                </Button>
-                <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
-              </div>
-              {!isScreenSharing && (
-                <div className="text-xs font-mono">
-                  <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
-                </div>
+              {(mediaUrl || isScreenSharing) && (
+                <>
+                  <div className="flex items-center gap-2 w-32">
+                    <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleMuteToggle}>
+                      {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
+                    </Button>
+                    <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
+                  </div>
+                  {!isScreenSharing && (
+                    <div className="text-xs font-mono">
+                      <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
-              {isFullscreen ? <Minimize /> : <Maximize />}
-            </Button>
+            {(mediaUrl || isScreenSharing) && (
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
+                {isFullscreen ? <Minimize /> : <Maximize />}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -284,5 +292,3 @@ export function VideoPlayer({ roomId, isHost }: VideoPlayerProps) {
     </Card>
   );
 }
-
-    
