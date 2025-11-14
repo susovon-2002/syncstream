@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -20,15 +21,22 @@ import { initiateEmailSignIn, initiateEmailSignUp, initiateGoogleSignIn } from '
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Separator } from '../ui/separator';
+import { Checkbox } from '../ui/checkbox';
 
 const signUpSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  isNotRobot: z.boolean().refine(val => val === true, {
+    message: "Please confirm you are not a robot.",
+  }),
 });
 
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+  isNotRobot: z.boolean().refine(val => val === true, {
+    message: "Please confirm you are not a robot.",
+  }),
 });
 
 export function AuthForm() {
@@ -43,13 +51,16 @@ export function AuthForm() {
 
   const signUpForm = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: '', isNotRobot: false },
   });
 
   const signInForm = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: '', isNotRobot: false },
   });
+
+  const isSignUpButtonDisabled = !signUpForm.watch('isNotRobot');
+  const isSignInButtonDisabled = !signInForm.watch('isNotRobot');
 
   function onSignUp(values: z.infer<typeof signUpSchema>) {
     initiateEmailSignUp(auth, values.email, values.password);
@@ -79,6 +90,29 @@ export function AuthForm() {
         </Button>
     </div>
   )
+
+  const RobotCheckbox = ({ form }: { form: any }) => (
+     <FormField
+      control={form.control}
+      name="isNotRobot"
+      render={({ field }) => (
+        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+          <FormControl>
+            <Checkbox
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          </FormControl>
+          <div className="space-y-1 leading-none">
+            <FormLabel>
+              I am not a robot
+            </FormLabel>
+            <FormMessage />
+          </div>
+        </FormItem>
+      )}
+    />
+  );
 
   return (
     <Card className="w-full max-w-md">
@@ -123,7 +157,8 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full">
+                <RobotCheckbox form={signInForm} />
+                <Button type="submit" className="w-full" disabled={isSignInButtonDisabled}>
                   Sign In
                 </Button>
               </form>
@@ -165,7 +200,8 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full">
+                <RobotCheckbox form={signUpForm} />
+                <Button type="submit" className="w-full" disabled={isSignUpButtonDisabled}>
                   Sign Up
                 </Button>
               </form>
