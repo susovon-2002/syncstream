@@ -12,7 +12,7 @@ export function Footer() {
             </Link>
             <div className='mt-4 space-y-2 text-sm'>
                 <p className='font-semibold'>Contact Us</p>
-                <p>support@syncstream.app</p>
+                <p>susovonsantra4@gmail.com</p>
             </div>
             <div className='mt-4 space-y-2 text-sm'>
                 <p className='font-semibold'>Follow Us</p>
