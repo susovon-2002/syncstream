@@ -14,6 +14,7 @@ interface AddMediaTabsProps {
 
 export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
   const [url, setUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
 
   const isYoutubeUrl = (url: string) => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/;
@@ -24,8 +25,6 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
     e.preventDefault();
     if (!url) return;
     
-    const isDirectLink = /\.(mp4|webm|mkv|mp3|ogg|wav)$/i.test(url);
-
     const source = isYoutubeUrl(url) ? 'youtube' : 'file';
     const title = url.split('/').pop() || 'Direct Media';
     onUrlSelect(url, title, source);
@@ -40,12 +39,26 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleFileUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (file) {
+      const fileUrl = URL.createObjectURL(file);
+      onUrlSelect(fileUrl, file.name, 'file');
+    }
+  };
+
   return (
     <Tabs defaultValue="url" className="w-full">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="url">From URL</TabsTrigger>
         <TabsTrigger value="screen">Share Screen</TabsTrigger>
-        <TabsTrigger value="upload" disabled>Upload File</TabsTrigger>
+        <TabsTrigger value="upload">Upload File</TabsTrigger>
       </TabsList>
       <TabsContent value="url">
         <Card className="border-none shadow-none bg-transparent">
@@ -80,20 +93,28 @@ export function AddMediaTabs({ onUrlSelect }: AddMediaTabsProps) {
         <Card className="border-none shadow-none bg-transparent">
           <CardHeader>
             <CardTitle>Upload File</CardTitle>
-            <CardDescription>Upload your own video or audio file.</CardDescription>
+            <CardDescription>Upload your own video or audio file. (Visible only to you)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-center w-full">
-                <Label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-secondary">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
-                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                        <p className="text-xs text-muted-foreground">MP4, WEBM, MP3 (MAX. 500MB)</p>
-                    </div>
-                    <Input id="dropzone-file" type="file" className="hidden" />
-                </Label>
-            </div>
-            <Button className="w-full" disabled>Upload and Play</Button>
+            <form onSubmit={handleFileUpload} className="space-y-4">
+              <div className="flex items-center justify-center w-full">
+                  <Label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-secondary">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                          <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
+                          {file ? (
+                            <p className="font-semibold text-sm">{file.name}</p>
+                          ) : (
+                            <>
+                              <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                              <p className="text-xs text-muted-foreground">MP4, WEBM, MP3, etc.</p>
+                            </>
+                          )}
+                      </div>
+                      <Input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} />
+                  </Label>
+              </div>
+              <Button type="submit" className="w-full" disabled={!file}>Upload and Play</Button>
+            </form>
           </CardContent>
         </Card>
       </TabsContent>
