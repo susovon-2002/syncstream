@@ -1,5 +1,31 @@
 import Link from 'next/link';
-import { Clapperboard } from 'lucide-react';
+
+const Logo = () => (
+    <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="text-primary"
+    >
+        <path
+            d="M21 14L10.5 21V7L21 14Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <path
+            d="M17.5 14L7 21V7L17.5 14Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ opacity: 0.5 }}
+        />
+    </svg>
+);
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -9,7 +35,7 @@ export function Footer() {
       <div className="container mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
         <div className="col-span-1 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 text-xl font-bold text-foreground">
-                <Clapperboard className="h-7 w-7 text-primary" />
+                <Logo />
                 <span className="font-headline">SyncStream</span>
             </Link>
             <div className='mt-4 space-y-2 text-sm'>
