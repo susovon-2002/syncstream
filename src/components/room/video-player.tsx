@@ -368,7 +368,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
       {showPlayer && (
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           
-          {isDrawingMode && isHost && (
+          {isDrawingMode && (
             <div className="absolute bottom-20 left-4 flex gap-2 items-center bg-background/50 p-2 rounded-md">
               <Popover>
                 <PopoverTrigger asChild>
@@ -429,24 +429,20 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
               )}
             </div>
             <div className="flex items-center gap-2">
-                {isHost && (
-                    <>
-                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot} disabled={isYoutube}>
-                            <Camera />
-                        </Button>
-                        {!isScreenShare && (
-                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
-                                {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
-                            </Button>
-                        )}
-                         <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
-                            <PenTool />
-                        </Button>
-                    </>
-                )}
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
-                {isFullscreen ? <Minimize /> : <Maximize />}
-                </Button>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot} disabled={isYoutube}>
+                  <Camera />
+              </Button>
+              {!isScreenShare && (
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
+                      {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
+                  </Button>
+              )}
+                <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
+                  <PenTool />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
+              {isFullscreen ? <Minimize /> : <Maximize />}
+              </Button>
             </div>
           </div>
         </div>
