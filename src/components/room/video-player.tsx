@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { AddMediaTabs } from './add-media-tabs';
 import { Card } from '../ui/card';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Camera, Video as VideoIcon, Circle } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Camera, Video as VideoIcon, Circle, PenTool, Eraser } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { useFirebase } from '@/firebase';
@@ -15,10 +15,14 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import ReactPlayer from 'react-player/lazy';
 import { useMemoFirebase } from '@/firebase/provider';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 interface VideoPlayerProps {
   roomId: string;
 }
+
+const drawingColors = ['#E53935', '#1E88E5', '#43A047', '#FDD835', '#FFFFFF', '#000000'];
+
 
 export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const { firestore, user } = useFirebase();
@@ -33,10 +37,16 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+
+  // Drawing State
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingColor, setDrawingColor] = useState('#E53935');
   
   // Refs
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<ReactPlayer>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const seekingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -244,13 +254,60 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-
   const formatTime = (time: number) => {
     if (isNaN(time) || time < 0) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  // Drawing logic
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !playerContainerRef.current) return;
+    const { width, height } = playerContainerRef.current.getBoundingClientRect();
+    canvas.width = width;
+    canvas.height = height;
+  }, [isDrawingMode]);
+
+  const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawingMode) return;
+    const { offsetX, offsetY } = nativeEvent;
+    const context = canvasRef.current?.getContext('2d');
+    if (!context) return;
+    context.strokeStyle = drawingColor;
+    context.lineWidth = 5;
+    context.lineCap = 'round';
+    context.beginPath();
+    context.moveTo(offsetX, offsetY);
+    setIsDrawing(true);
+  };
+
+  const finishDrawing = () => {
+    if (!isDrawingMode || !isDrawing) return;
+    const context = canvasRef.current?.getContext('2d');
+    if (!context) return;
+    context.closePath();
+    setIsDrawing(false);
+  };
+
+  const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !isDrawingMode) return;
+    const { offsetX, offsetY } = nativeEvent;
+    const context = canvasRef.current?.getContext('2d');
+    if (!context) return;
+    context.lineTo(offsetX, offsetY);
+    context.stroke();
+  };
+  
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
 
   const showPlayer = !!mediaUrl || (isHost && isScreenShare);
 
@@ -267,55 +324,102 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
           )}
         </div>
       ) : (
-        <ReactPlayer
-            ref={playerRef}
-            url={mediaUrl as (string | MediaStream)}
-            playing={isPlaying}
-            controls={false}
-            volume={volume}
-            muted={isMuted}
-            width="100%"
-            height="100%"
-            onReady={() => setIsReady(true)}
-            onPlay={isMember ? handlePlay : undefined}
-            onPause={isMember ? handlePause : undefined}
-            onProgress={handleProgress}
-            onDuration={setDuration}
-            progressInterval={1000}
-            config={{
-                youtube: { playerVars: { showinfo: 0, controls: 0 } },
-                file: { attributes: { style: { objectFit: 'contain' }, crossOrigin: 'anonymous' } }
-            }}
-        />
+        <>
+            <ReactPlayer
+                ref={playerRef}
+                url={mediaUrl as (string | MediaStream)}
+                playing={isPlaying}
+                controls={false}
+                volume={volume}
+                muted={isMuted}
+                width="100%"
+                height="100%"
+                onReady={() => setIsReady(true)}
+                onPlay={isMember ? handlePlay : undefined}
+                onPause={isMember ? handlePause : undefined}
+                onProgress={handleProgress}
+                onDuration={setDuration}
+                progressInterval={1000}
+                config={{
+                    youtube: { playerVars: { showinfo: 0, controls: 0 } },
+                    file: { attributes: { style: { objectFit: 'contain' }, crossOrigin: 'anonymous' } }
+                }}
+            />
+            {isDrawingMode && (
+                <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                    onMouseDown={startDrawing}
+                    onMouseUp={finishDrawing}
+                    onMouseMove={draw}
+                    onMouseLeave={finishDrawing}
+                />
+            )}
+        </>
       )}
 
-      {showPlayer && !isScreenShare && (
+      {showPlayer && (
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="flex flex-col gap-2">
-            <Slider
-              value={[progress]}
-              max={duration}
-              onValueChange={isMember ? handleSeek : undefined}
-              onPointerDown={() => seekingRef.current = true}
-              onPointerUp={() => seekingRef.current = false}
-              className={isMember ? "cursor-pointer" : "cursor-default"}
-              disabled={!isMember}
-            />
-          </div>
+          
+          {isDrawingMode && isHost && (
+            <div className="absolute bottom-20 left-4 flex gap-2 items-center bg-background/50 p-2 rounded-md">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="w-8 h-8" style={{ backgroundColor: drawingColor, border: '2px solid white' }} />
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2">
+                  <div className="flex gap-1">
+                    {drawingColors.map(color => (
+                      <Button
+                        key={color}
+                        variant="ghost"
+                        size="icon"
+                        className="w-8 h-8 rounded-full"
+                        style={{ backgroundColor: color }}
+                        onClick={() => setDrawingColor(color)}
+                      />
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={clearCanvas}>
+                  <Eraser />
+                </Button>
+            </div>
+          )}
+
+          {!isScreenShare && (
+            <div className="flex flex-col gap-2">
+              <Slider
+                value={[progress]}
+                max={duration}
+                onValueChange={isMember ? handleSeek : undefined}
+                onPointerDown={() => seekingRef.current = true}
+                onPointerUp={() => seekingRef.current = false}
+                className={isMember ? "cursor-pointer" : "cursor-default"}
+                disabled={!isMember}
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between text-white mt-2">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay} disabled={!isMember}>
-                {isPlaying ? <Pause /> : <Play />}
-              </Button>
-              <div className="flex items-center gap-2 w-32">
-                <Button variant="ghost" size="icon" className="text-white hover-bg-white/10" onClick={handleMuteToggle}>
-                  {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
+              {!isScreenShare && (
+                <>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay} disabled={!isMember}>
+                  {isPlaying ? <Pause /> : <Play />}
                 </Button>
-                <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
-              </div>
-              <div className="text-xs font-mono">
-                <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
-              </div>
+                <div className="flex items-center gap-2 w-32">
+                  <Button variant="ghost" size="icon" className="text-white hover-bg-white/10" onClick={handleMuteToggle}>
+                    {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
+                  </Button>
+                  <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
+                </div>
+                <div className="text-xs font-mono">
+                  <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
+                </div>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
                 {isHost && (
@@ -323,8 +427,13 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
                         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot}>
                             <Camera />
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording}>
-                            {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
+                        {!isScreenShare && (
+                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording}>
+                                {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
+                            </Button>
+                        )}
+                         <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
+                            <PenTool />
                         </Button>
                     </>
                 )}
