@@ -59,6 +59,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const isMember = user && roomState ? user.uid in roomState.members : false;
 
   const isScreenShare = roomState?.media?.source === 'screen';
+  const isYoutube = roomState?.media?.source === 'youtube';
   const mediaUrl = isScreenShare ? localMedia : roomState?.media?.url;
   const isPlaying = roomState?.playback?.isPlaying;
 
@@ -179,8 +180,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
 
   const handleScreenshot = () => {
     if (!playerRef.current) return;
-    const player = playerRef.current.getInternalPlayer() as HTMLVideoElement;
-    if (!player) return;
+    const player = playerRef.current.getInternalPlayer();
+    if (!player || !(player instanceof HTMLVideoElement)) {
+        toast({ variant: "destructive", title: "Cannot take screenshot", description: "This feature is not available for the current video type." });
+        return;
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = player.videoWidth;
@@ -205,9 +209,12 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     } else {
       // Start recording
       if (!playerRef.current) return;
-      const player = playerRef.current.getInternalPlayer() as HTMLVideoElement;
-      if (!player) return;
-
+      const player = playerRef.current.getInternalPlayer();
+      if (!player || !(player instanceof HTMLVideoElement)) {
+        toast({ variant: 'destructive', title: 'Could not start recording', description: 'This feature is not available for the current video type.' });
+        return;
+      }
+      
       const stream = (player as any).captureStream();
       if (!stream) {
         toast({ variant: 'destructive', title: 'Could not start recording', description: 'Unable to capture video stream.' });
@@ -424,11 +431,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
             <div className="flex items-center gap-2">
                 {isHost && (
                     <>
-                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot}>
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot} disabled={isYoutube}>
                             <Camera />
                         </Button>
                         {!isScreenShare && (
-                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording}>
+                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
                                 {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
                             </Button>
                         )}
