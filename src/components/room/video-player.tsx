@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
@@ -56,7 +57,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const [roomState, loadingRoomState] = useDocumentData(roomRef);
   
   const isHost = user && roomState ? roomState.hostId === user.uid : false;
-  const isMember = user && roomState ? user.uid in roomState.members : false;
 
   const isScreenShare = roomState?.media?.source === 'screen';
   const isYoutube = roomState?.media?.source === 'youtube';
@@ -96,7 +96,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
 
 
   const updatePlaybackState = (state: any) => {
-    if (!roomRef || isScreenShare || !isMember) return;
+    if (!roomRef || isScreenShare || !user) return;
     setDocumentNonBlocking(roomRef, {
         playback: {
           ...roomState?.playback,
@@ -144,7 +144,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
-     if (isMember && !seekingRef.current && !isScreenShare) {
+     if (user && !seekingRef.current && !isScreenShare) {
         // More frequent updates can be taxing, let's allow host to be the main source of truth
         if (isHost) {
           updatePlaybackState({ progress: state.playedSeconds });
@@ -342,8 +342,8 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
                 width="100%"
                 height="100%"
                 onReady={() => setIsReady(true)}
-                onPlay={isMember ? handlePlay : undefined}
-                onPause={isMember ? handlePause : undefined}
+                onPlay={user ? handlePlay : undefined}
+                onPause={user ? handlePause : undefined}
                 onProgress={handleProgress}
                 onDuration={setDuration}
                 progressInterval={1000}
@@ -400,11 +400,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
               <Slider
                 value={[progress]}
                 max={duration}
-                onValueChange={isMember ? handleSeek : undefined}
+                onValueChange={user ? handleSeek : undefined}
                 onPointerDown={() => seekingRef.current = true}
                 onPointerUp={() => seekingRef.current = false}
-                className={isMember ? "cursor-pointer" : "cursor-default"}
-                disabled={!isMember}
+                className={user ? "cursor-pointer" : "cursor-default"}
+                disabled={!user}
               />
             </div>
           )}
@@ -413,7 +413,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
             <div className="flex items-center gap-4">
               {!isScreenShare && (
                 <>
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay} disabled={!isMember}>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={isPlaying ? handlePause : handlePlay} disabled={!user}>
                   {isPlaying ? <Pause /> : <Play />}
                 </Button>
                 <div className="flex items-center gap-2 w-32">
@@ -432,12 +432,10 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot} disabled={isYoutube}>
                   <Camera />
               </Button>
-              {!isScreenShare && (
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
-                      {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
-                  </Button>
-              )}
-                <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
+                  {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
+              </Button>
+              <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
                   <PenTool />
               </Button>
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
@@ -460,3 +458,4 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     </Card>
   );
 }
+
