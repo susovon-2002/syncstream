@@ -111,7 +111,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           <RoomIdDisplay roomId={id} />
         </div>
       </Header>
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-4 p-4 overflow-hidden">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_450px] gap-4 p-4 overflow-hidden">
         <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-4">
             <VideoPlayer roomId={id} />
         </div>
