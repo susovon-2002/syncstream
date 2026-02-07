@@ -4,8 +4,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { HTMLAttributes } from 'react';
 import { useFirebase } from '@/firebase';
-import { Button } from './ui/button';
-import { UserNav } from './auth/user-nav';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 type HeaderProps = HTMLAttributes<HTMLElement>;
 
@@ -49,8 +48,11 @@ export function Header({ className, children, ...props }: HeaderProps) {
         </Link>
         <div className="flex items-center gap-4">
           {children}
-          {!isUserLoading && (
-            user ? <UserNav /> : <Button asChild variant="secondary"><Link href="/login">Login</Link></Button>
+          {!isUserLoading && user && (
+            <Avatar className="h-8 w-8 border border-border">
+              <AvatarImage src={user.photoURL || ''} />
+              <AvatarFallback className="text-[10px]">{user.uid.substring(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
           )}
         </div>
       </div>

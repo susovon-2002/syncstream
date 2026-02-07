@@ -10,12 +10,11 @@ import { ArrowRight, PartyPopper } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { doc } from 'firebase/firestore';
-import Link from 'next/link';
 
 export function Hero() {
   const [roomId, setRoomId] = useState('');
   const router = useRouter();
-  const { user, firestore } = useFirebase();
+  const { user, firestore, isUserLoading } = useFirebase();
 
   const handleCreateRoom = () => {
     if (!user || !firestore) return;
@@ -24,7 +23,7 @@ export function Hero() {
     const roomRef = doc(firestore, 'rooms', newRoomId);
     setDocumentNonBlocking(roomRef, {
       id: newRoomId,
-      name: `${user.displayName || 'Anonymous'}'s Room`,
+      name: `${user.displayName || 'Guest'}'s Room`,
       hostId: user.uid,
       createdAt: new Date(),
       members: {
@@ -54,46 +53,44 @@ export function Hero() {
         SyncStream
       </h1>
       <p className="max-w-3xl text-lg text-muted-foreground md:text-xl">
-        Watch videos with friends in perfect sync. Create a private room, share a video link, and enjoy a shared viewing experience with live chat and video calls.
+        Watch videos with friends in perfect sync. Create a private room, share a video link, and enjoy a shared viewing experience instantly.
       </p>
       
       <Card className="w-full max-w-md bg-card/50 backdrop-blur-sm border-border/20">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Get Started</CardTitle>
-          <CardDescription>Create a new room or join an existing one.</CardDescription>
+          <CardDescription>Start watching together now. No sign-up required.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {user ? (
-            <>
-              <Button size="lg" className="w-full font-bold text-lg uppercase tracking-wider" onClick={handleCreateRoom}>
-                <PartyPopper className="mr-2" /> Create Room
-              </Button>
+          <Button 
+            size="lg" 
+            className="w-full font-bold text-lg uppercase tracking-wider" 
+            onClick={handleCreateRoom}
+            disabled={isUserLoading}
+          >
+            {isUserLoading ? 'Preparing...' : <><PartyPopper className="mr-2" /> Create Room</>}
+          </Button>
 
-              <div className="flex items-center gap-4">
-                <Separator className="flex-1" />
-                <span className="text-xs text-muted-foreground">OR</span>
-                <Separator className="flex-1" />
-              </div>
-              
-              <form onSubmit={handleJoinRoom} className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="ENTER ROOM ID"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  className="font-code text-center tracking-widest placeholder:text-muted-foreground/50"
-                  aria-label="Room ID to join"
-                />
-                <Button type="submit" size="icon" variant="secondary" aria-label="Join Room">
-                  <ArrowRight />
-                </Button>
-              </form>
-            </>
-          ) : (
-             <Button size="lg" className="w-full" asChild>
-                <Link href="/login">Login to Get Started</Link>
-             </Button>
-          )}
+          <div className="flex items-center gap-4">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <Separator className="flex-1" />
+          </div>
+          
+          <form onSubmit={handleJoinRoom} className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="ENTER ROOM ID"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              className="font-code text-center tracking-widest placeholder:text-muted-foreground/50"
+              aria-label="Room ID to join"
+              disabled={isUserLoading}
+            />
+            <Button type="submit" size="icon" variant="secondary" aria-label="Join Room" disabled={isUserLoading || !roomId.trim()}>
+              <ArrowRight />
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

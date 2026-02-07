@@ -1,13 +1,21 @@
-import { AuthForm } from '@/components/auth/auth-form';
-import { Header } from '@/components/header';
+'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+/**
+ * Login page is no longer used. Redirects to home.
+ */
 export default function LoginPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/');
+  }, [router]);
+
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-1 flex items-center justify-center p-4">
-        <AuthForm />
-      </main>
+    <div className="flex items-center justify-center min-h-screen">
+      <p className="text-muted-foreground">Redirecting...</p>
     </div>
   );
 }

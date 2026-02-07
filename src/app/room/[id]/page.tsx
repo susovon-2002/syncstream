@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useEffect, use, useState } from 'react';
-import { doc, collection, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useEffect, use } from 'react';
+import { doc, collection, updateDoc } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { useFirebase } from '@/firebase';
 
@@ -14,28 +13,19 @@ import { RoomIdDisplay } from '@/components/room/room-id-display';
 import { useCollection } from '@/firebase';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useMemoFirebase } from '@/firebase/provider';
-import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserVideo } from '@/components/room/user-video';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { id } = use(params);
-  const { auth, firestore, user, isUserLoading } = useFirebase();
-  const router = useRouter();
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
+  const { firestore, user, isUserLoading } = useFirebase();
 
   const roomRef = useMemoFirebase(() => firestore ? doc(firestore, 'rooms', id) : null, [firestore, id]);
   const [room, loadingRoom] = useDocumentData(roomRef);
 
   const roomUsersRef = useMemoFirebase(
-    () => (firestore && user && !isUserLoading) ? collection(roomRef, 'roomUsers') : null, 
+    () => (firestore && user && !isUserLoading) ? collection(roomRef!, 'roomUsers') : null, 
     [firestore, user, isUserLoading, roomRef]
   );
   const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
@@ -46,7 +36,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
       const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
       setDocumentNonBlocking(userRef, {
         uid: user.uid,
-        displayName: user.displayName || user.email || 'Anonymous',
+        displayName: user.displayName || `Guest_${user.uid.substring(0, 4)}`,
         photoURL: user.photoURL,
         joinedAt: new Date(),
         isCameraOn: false,
@@ -54,20 +44,17 @@ export default function RoomPage({ params }: { params: { id: string } }) {
     }
   }, [user, firestore, id]);
 
-  // Handle user leaving room (presence)
+  // Handle user leaving room (cleanup)
   useEffect(() => {
     if (!user || !firestore || !id) return;
 
     const handleBeforeUnload = () => {
       const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
-      updateDoc(userRef, { isCameraOn: false }); // Turn off camera on leaving
+      updateDoc(userRef, { isCameraOn: false }); 
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [user, firestore, id]);
 
   const videoParticipants = roomUsers?.filter(p => p.isCameraOn);
@@ -77,7 +64,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
       <div className="flex flex-col h-dvh bg-background">
          <Header />
          <main className="flex-1 flex items-center justify-center">
-            <p>Loading room...</p>
+            <p>Joining room...</p>
          </main>
       </div>
     )
@@ -97,7 +84,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
                     <TooltipTrigger>
                       <Avatar className="h-7 w-7 border-2 border-background">
                         <AvatarImage src={u.photoURL} />
-                        <AvatarFallback>{u.displayName?.charAt(0) || 'A'}</AvatarFallback>
+                        <AvatarFallback className="text-[10px]">{u.displayName?.charAt(0) || 'G'}</AvatarFallback>
                       </Avatar>
                     </TooltipTrigger>
                     <TooltipContent>
