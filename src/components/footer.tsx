@@ -10,19 +10,18 @@ const Logo = () => (
         className="text-primary"
     >
         <path
-            d="M21 14L10.5 21V7L21 14Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            d="M22 10C22 10 18 7 12 7C6 7 4 11 4 11L18 15C18 15 22 13 22 10Z"
+            fill="currentColor"
         />
         <path
-            d="M17.5 14L7 21V7L17.5 14Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ opacity: 0.5 }}
+            d="M24 14C24 14 20 11 14 11C8 11 6 15 6 15L20 19C20 19 24 17 24 14Z"
+            fill="currentColor"
+            style={{ opacity: 0.8 }}
+        />
+        <path
+            d="M22 18C22 18 18 15 12 15C6 15 4 19 4 19L18 23C18 23 22 21 22 18Z"
+            fill="currentColor"
+            style={{ opacity: 0.6 }}
         />
     </svg>
 );
