@@ -36,13 +36,8 @@ export function Hero() {
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (roomId.trim() && user && firestore) {
-       const roomRef = doc(firestore, 'rooms', roomId.trim());
-        setDocumentNonBlocking(roomRef, {
-            members: {
-                [user.uid]: 'participant'
-            }
-        }, { merge: true });
+    if (roomId.trim()) {
+      // Just navigate. The RoomPage component will handle adding the user to members map.
       router.push(`/room/${roomId.trim()}`);
     }
   };

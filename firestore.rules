@@ -40,7 +40,7 @@ service cloud.firestore {
       }
 
       function isMember() {
-        return request.auth.uid in resource.data.members;
+        return request.auth.uid in resource.data.get('members', {});
       }
 
       allow get, list: if isSignedIn();
@@ -49,7 +49,7 @@ service cloud.firestore {
         isHost() || 
         isMember() || 
         // Allow joining: The request adds the current user to the members map
-        (request.resource.data.members[request.auth.uid] != null)
+        (request.resource.data.get('members', {})[request.auth.uid] != null)
       );
       allow delete: if isSignedIn() && isHost();
 

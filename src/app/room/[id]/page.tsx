@@ -33,8 +33,16 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   // Handle user joining room
   useEffect(() => {
     if (user && firestore && id) {
-      const userRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
-      setDocumentNonBlocking(userRef, {
+      // 1. Add user to the main room's members map for authorization
+      setDocumentNonBlocking(roomRef!, {
+        members: {
+          [user.uid]: 'participant'
+        }
+      }, { merge: true });
+
+      // 2. Add user to the roomUsers subcollection for presence
+      const userPresenceRef = doc(firestore, 'rooms', id, 'roomUsers', user.uid);
+      setDocumentNonBlocking(userPresenceRef, {
         uid: user.uid,
         displayName: user.displayName || `Guest_${user.uid.substring(0, 4)}`,
         photoURL: user.photoURL,
@@ -42,7 +50,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
         isCameraOn: false,
       }, { merge: true });
     }
-  }, [user, firestore, id]);
+  }, [user, firestore, id, roomRef]);
 
   // Handle user leaving room (cleanup)
   useEffect(() => {

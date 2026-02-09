@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
@@ -63,18 +62,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const mediaUrl = isScreenShare ? localMedia : roomState?.media?.url;
   const isPlaying = roomState?.playback?.isPlaying;
 
-  // Derived State
-  const placeholderImage = PlaceHolderImages.find((p) => p.id === 'video-placeholder');
-  
   // Sync client player to Firebase state
   useEffect(() => {
     const video = playerRef.current;
     if (!video || !roomState?.playback || seekingRef.current || !isReady || isScreenShare) return;
 
-    if (video.props.playing !== isPlaying) {
-      // Handled by ReactPlayer's `playing` prop
-    }
-    
     if(!roomState.playback.lastUpdated) return;
 
     const serverTime = roomState.playback.lastUpdated.toDate().getTime();
@@ -145,7 +137,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
      if (user && !seekingRef.current && !isScreenShare) {
-        // More frequent updates can be taxing, let's allow host to be the main source of truth
         if (isHost) {
           updatePlaybackState({ progress: state.playedSeconds });
         }
@@ -203,11 +194,9 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
 
   const handleToggleRecording = () => {
     if (isRecording) {
-      // Stop recording
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
     } else {
-      // Start recording
       if (!playerRef.current) return;
       const player = playerRef.current.getInternalPlayer();
       if (!player || !(player instanceof HTMLVideoElement)) {
@@ -249,7 +238,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
 
   useEffect(() => {
     if (mediaRecorderRef.current?.state === 'recording' && !isPlaying) {
-      // If playback pauses, stop the recording to prevent silent videos
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
@@ -458,4 +446,3 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     </Card>
   );
 }
-
