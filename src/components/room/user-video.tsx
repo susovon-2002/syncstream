@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useFirebase } from '@/firebase';
-import { doc, collection, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection, onSnapshot, setDoc, deleteDoc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 
 interface UserVideoProps {
     user: any; // roomUser object
@@ -77,12 +77,14 @@ export function UserVideo({ user: roomUser, isLocalUser }: UserVideoProps) {
                             const pc = new RTCPeerConnection(ICE_SERVERS);
                             peerConnections.current[fromUid] = pc;
                             
-                            stream?.getTracks().forEach(track => pc.addTrack(track, stream));
+                            if (stream) {
+                                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                            }
 
                             pc.onicecandidate = (event) => {
                                 if (event.candidate) {
                                     updateDoc(change.doc.ref, { 
-                                        answerCandidates: Array.isArray(data.answerCandidates) ? [...data.answerCandidates, event.candidate.toJSON()] : [event.candidate.toJSON()] 
+                                        answerCandidates: arrayUnion(event.candidate.toJSON()) 
                                     });
                                 }
                             };
@@ -115,23 +117,25 @@ export function UserVideo({ user: roomUser, isLocalUser }: UserVideoProps) {
                 
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
-                        setDoc(signalDoc, { 
-                            offerCandidates: Array.isArray(pc.localDescription) ? [] : [event.candidate.toJSON()] 
-                        }, { merge: true });
+                        updateDoc(signalDoc, { 
+                            offerCandidates: arrayUnion(event.candidate.toJSON()) 
+                        }).catch(() => {
+                            setDoc(signalDoc, { offerCandidates: [event.candidate.toJSON()] }, { merge: true });
+                        });
                     }
                 };
 
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                await setDoc(signalDoc, { offer: { type: offer.type, sdp: offer.sdp }, joinedAt: new Date() });
+                await setDoc(signalDoc, { offer: { type: offer.type, sdp: offer.sdp }, joinedAt: serverTimestamp() });
 
-                const unsubscribe = onSnapshot(signalDoc, (doc) => {
-                    const data = doc.data();
+                const unsubscribe = onSnapshot(signalDoc, (docSnap) => {
+                    const data = docSnap.data();
                     if (data?.answer && !pc.currentRemoteDescription) {
-                        pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(console.error);
                     }
                     if (data?.answerCandidates) {
-                        data.answerCandidates.forEach((c: any) => pc.addIceCandidate(new RTCIceCandidate(c)));
+                        data.answerCandidates.forEach((c: any) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error));
                     }
                 });
 
@@ -143,14 +147,14 @@ export function UserVideo({ user: roomUser, isLocalUser }: UserVideoProps) {
 
             const cleanup = initPC();
             return () => {
-                cleanup.then(c => c?.());
+                cleanup.then(c => c && c());
                 if (peerConnections.current[targetUid]) {
                     peerConnections.current[targetUid].close();
                     delete peerConnections.current[targetUid];
                 }
             };
         }
-    }, [firestore, currentUser, roomUser.isCameraOn, stream]);
+    }, [firestore, currentUser, roomUser.isCameraOn, stream, roomUser.roomId, roomUser.uid, isLocalUser]);
 
     const toggleMic = () => {
         if (stream) {

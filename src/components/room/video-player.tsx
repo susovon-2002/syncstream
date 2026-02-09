@@ -9,13 +9,12 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Camera, Video as Vid
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { useFirebase } from '@/firebase';
-import { doc, serverTimestamp, collection, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, collection, onSnapshot, setDoc, deleteDoc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import ReactPlayer from 'react-player/lazy';
 import { useMemoFirebase } from '@/firebase/provider';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -42,7 +41,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
 
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -52,8 +50,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const playerRef = useRef<ReactPlayer>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const seekingRef = useRef(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
   const peerConnections = useRef<{ [key: string]: RTCPeerConnection }>({});
 
   const roomRef = useMemoFirebase(() => (firestore && roomId) ? doc(firestore, 'rooms', roomId) : null, [firestore, roomId]);
@@ -63,6 +59,8 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const isScreenShare = roomState?.media?.source === 'screen';
   const mediaUrl = isScreenShare && !isHost ? localMedia : (isScreenShare && isHost ? localMedia : roomState?.media?.url);
   const isPlaying = roomState?.playback?.isPlaying;
+
+  const placeholderImage = GLOBAL_PLACEHOLDER.imageUrl;
 
   // WebRTC Screen Share Signaling
   useEffect(() => {
@@ -80,9 +78,15 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
               const pc = new RTCPeerConnection(ICE_SERVERS);
               peerConnections.current[fromUid] = pc;
               localMedia.getTracks().forEach(track => pc.addTrack(track, localMedia));
+              
               pc.onicecandidate = (e) => {
-                if (e.candidate) updateDoc(change.doc.ref, { answerCandidates: [...(data.answerCandidates || []), e.candidate.toJSON()] });
+                if (e.candidate) {
+                  updateDoc(change.doc.ref, { 
+                    answerCandidates: arrayUnion(e.candidate.toJSON()) 
+                  });
+                }
               };
+              
               await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
@@ -92,33 +96,54 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
         });
       });
       return () => unsubscribe();
-    } else if (!isHost) {
+    } else if (!isHost && !isScreenShare) {
       // Participant: Receive screen stream
       const initPC = async () => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
         const remoteStream = new MediaStream();
+        
         pc.ontrack = (e) => {
           e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
           setLocalMedia(remoteStream);
         };
+        
         const signalDoc = doc(firestore, 'rooms', roomId, 'screenSignals', user.uid);
+        
         pc.onicecandidate = (e) => {
-          if (e.candidate) setDoc(signalDoc, { offerCandidates: [...((await (await signalDoc.get()).data())?.offerCandidates || []), e.candidate.toJSON()] }, { merge: true });
+          if (e.candidate) {
+            updateDoc(signalDoc, { 
+              offerCandidates: arrayUnion(e.candidate.toJSON()) 
+            }).catch(() => {
+              setDoc(signalDoc, { offerCandidates: [e.candidate.toJSON()] }, { merge: true });
+            });
+          }
         };
+        
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await setDoc(signalDoc, { offer: { type: offer.type, sdp: offer.sdp } });
+        
         const unsubscribe = onSnapshot(signalDoc, (d) => {
           const data = d.data();
           if (data?.answer && !pc.currentRemoteDescription) pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-          if (data?.answerCandidates) data.answerCandidates.forEach((c: any) => pc.addIceCandidate(new RTCIceCandidate(c)));
+          if (data?.answerCandidates) {
+            data.answerCandidates.forEach((c: any) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error));
+          }
         });
-        return () => { unsubscribe(); deleteDoc(signalDoc); pc.close(); };
+        
+        return () => { 
+          unsubscribe(); 
+          deleteDoc(signalDoc); 
+          pc.close(); 
+        };
       };
+      
       const cleanup = initPC();
-      return () => cleanup.then(c => c());
+      return () => {
+        cleanup.then(c => c && c());
+      };
     }
-  }, [firestore, user, isScreenShare, isHost, localMedia]);
+  }, [firestore, user, isScreenShare, isHost, localMedia, roomId]);
 
   // Sync client player to Firebase state
   useEffect(() => {
@@ -320,13 +345,12 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
         </div>
       )}
 
-      {!mediaUrl && !isScreenShare && GLOBAL_PLACEHOLDER && (
+      {!mediaUrl && !isScreenShare && placeholderImage && (
         <Image
-          src={GLOBAL_PLACEHOLDER.imageUrl}
-          alt={GLOBAL_PLACEHOLDER.description}
+          src={placeholderImage}
+          alt="Video stream background"
           fill
           className="object-cover -z-10 opacity-30 grayscale blur-sm"
-          data-ai-hint={GLOBAL_PLACEHOLDER.imageHint}
         />
       )}
     </Card>
