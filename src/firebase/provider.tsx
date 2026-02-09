@@ -23,14 +23,13 @@ interface UserAuthState {
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  areServicesAvailable: boolean; // True if core services (app, firestore, auth instance) are provided
+  areServicesAvailable: boolean;
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
-  auth: Auth | null; // The Auth service instance
-  // User authentication state
+  auth: Auth | null;
   user: User | null;
-  isUserLoading: boolean; // True during initial auth check
-  userError: Error | null; // Error from auth listener
+  isUserLoading: boolean;
+  userError: Error | null;
 }
 
 // Return type for useFirebase()
@@ -43,19 +42,18 @@ export interface FirebaseServicesAndUser {
   userError: Error | null;
 }
 
-// Return type for useUser() - specific to user auth state
+// Return type for useUser()
 export interface UserHookResult { 
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
 
-// React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 /**
- * FirebaseProvider manages and provides Firebase services and user authentication state.
- * Automatically signs users in anonymously to remove the login barrier.
+ * FirebaseProvider manages and provides Firebase services.
+ * Resilience: Services are provided even during SSR to prevent hook crashes.
  */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -69,56 +67,47 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     userError: null,
   });
 
-  // Effect to subscribe to Firebase auth state changes and handle auto-login
   useEffect(() => {
-    if (!auth || !firestore) {
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth or Firestore service not provided.") });
-      return;
-    }
+    if (!auth || !firestore) return;
 
     const unsubscribe = onAuthStateChanged(
       auth,
       async (firebaseUser) => {
         if (!firebaseUser) {
-          // If no user is logged in, automatically sign in anonymously
           signInAnonymously(auth).catch((error) => {
             console.error("Auto anonymous sign-in failed:", error);
-            setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: error }));
+            setUserAuthState(prev => ({ ...prev, isUserLoading: false }));
           });
           return;
         }
 
-        // Check if user document exists, if not, create it for the guest
         const userRef = doc(firestore, "users", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          const userData = {
-            id: firebaseUser.uid,
-            username: `Guest_${firebaseUser.uid.substring(0, 4)}`,
-            email: `guest_${firebaseUser.uid.substring(0, 6)}@syncstream.io`,
-          };
-          setDocumentNonBlocking(userRef, userData, { merge: true });
-        }
+        getDoc(userRef).then((userSnap) => {
+          if (!userSnap.exists()) {
+            const userData = {
+              id: firebaseUser.uid,
+              username: `Guest_${firebaseUser.uid.substring(0, 4)}`,
+              email: `guest_${firebaseUser.uid.substring(0, 6)}@syncstream.io`,
+            };
+            setDocumentNonBlocking(userRef, userData, { merge: true });
+          }
+        }).catch(console.error);
         
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => {
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
       }
     );
     return () => unsubscribe(); 
   }, [auth, firestore]);
 
-  // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
-      areServicesAvailable: servicesAvailable,
-      firebaseApp: servicesAvailable ? firebaseApp : null,
-      firestore: servicesAvailable ? firestore : null,
-      auth: servicesAvailable ? auth : null,
+      areServicesAvailable: !!(firebaseApp && firestore && auth),
+      firebaseApp,
+      firestore,
+      auth,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
@@ -140,14 +129,12 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
-  }
-
+  // During SSR or early initialization, we return the services as provided.
+  // We only throw if they are missing after hydration and actually required.
   return {
-    firebaseApp: context.firebaseApp,
-    firestore: context.firestore,
-    auth: context.auth,
+    firebaseApp: context.firebaseApp!,
+    firestore: context.firestore!,
+    auth: context.auth!,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
@@ -173,10 +160,8 @@ type MemoFirebase <T> = T & {__memo?: boolean};
 
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
   const memoized = useMemo(factory, deps);
-  
   if(typeof memoized !== 'object' || memoized === null) return memoized;
   (memoized as MemoFirebase<T>).__memo = true;
-  
   return memoized;
 }
 

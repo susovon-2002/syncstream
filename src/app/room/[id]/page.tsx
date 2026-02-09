@@ -24,7 +24,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const { firestore, user, isUserLoading } = useFirebase();
 
-  const roomRef = useMemoFirebase(() => firestore ? doc(firestore, 'rooms', id) : null, [firestore, id]);
+  const roomRef = useMemoFirebase(() => (firestore && id) ? doc(firestore, 'rooms', id) : null, [firestore, id]);
   const [room, loadingRoom, roomError] = useDocumentData(roomRef);
 
   const roomUsersRef = useMemoFirebase(
@@ -90,7 +90,8 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       )
   }
 
-  if (isUserLoading || loadingRoom || !user) {
+  // Next.js 15: Guard against undefined ID or loading states to prevent hydration errors
+  if (!id || isUserLoading || loadingRoom || !user) {
     return (
       <div className="flex flex-col h-dvh bg-background">
          <Header />

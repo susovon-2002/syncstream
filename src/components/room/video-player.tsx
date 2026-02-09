@@ -23,6 +23,9 @@ interface VideoPlayerProps {
 
 const drawingColors = ['#E53935', '#1E88E5', '#43A047', '#FDD835', '#FFFFFF', '#000000'];
 
+// Robust global reference for the placeholder image to prevent ReferenceError
+const GLOBAL_PLACEHOLDER = PlaceHolderImages.find(img => img.id === 'video-placeholder') || PlaceHolderImages[0];
+
 export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
@@ -50,11 +53,8 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
-  // Placeholder - Defining this clearly to avoid ReferenceError
-  const placeholderImage = PlaceHolderImages.find(img => img.id === 'video-placeholder') || PlaceHolderImages[0];
-
   // Firebase Room State
-  const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
+  const roomRef = useMemoFirebase(() => (firestore && roomId) ? doc(firestore, 'rooms', roomId) : null, [firestore, roomId]);
   const [roomState] = useDocumentData(roomRef);
   
   const isHost = user && roomState ? roomState.hostId === user.uid : false;
@@ -436,13 +436,13 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
         </div>
       )}
 
-      {!showPlayer && placeholderImage && (
+      {!showPlayer && GLOBAL_PLACEHOLDER && (
         <Image
-          src={placeholderImage.imageUrl}
-          alt={placeholderImage.description}
+          src={GLOBAL_PLACEHOLDER.imageUrl}
+          alt={GLOBAL_PLACEHOLDER.description}
           fill
           className="object-cover -z-10 opacity-20"
-          data-ai-hint={placeholderImage.imageHint}
+          data-ai-hint={GLOBAL_PLACEHOLDER.imageHint}
         />
       )}
     </Card>
