@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { Header } from '@/components/header';
 import { ChatPanel } from '@/components/room/chat-panel';
 import { VideoPlayer } from '@/components/room/video-player';
-import { Users } from 'lucide-react';
+import { Users, AlertCircle } from 'lucide-react';
 import { RoomIdDisplay } from '@/components/room/room-id-display';
 import { useCollection } from '@/firebase';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -16,13 +16,16 @@ import { useMemoFirebase } from '@/firebase/provider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserVideo } from '@/components/room/user-video';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { id } = use(params);
   const { firestore, user, isUserLoading } = useFirebase();
 
   const roomRef = useMemoFirebase(() => firestore ? doc(firestore, 'rooms', id) : null, [firestore, id]);
-  const [room, loadingRoom] = useDocumentData(roomRef);
+  const [room, loadingRoom, roomError] = useDocumentData(roomRef);
 
   const roomUsersRef = useMemoFirebase(
     () => (firestore && user && !isUserLoading) ? collection(roomRef!, 'roomUsers') : null, 
@@ -32,9 +35,9 @@ export default function RoomPage({ params }: { params: { id: string } }) {
 
   // Handle user joining room
   useEffect(() => {
-    if (user && firestore && id) {
+    if (user && firestore && id && roomRef) {
       // 1. Add user to the main room's members map for authorization
-      setDocumentNonBlocking(roomRef!, {
+      setDocumentNonBlocking(roomRef, {
         members: {
           [user.uid]: 'participant'
         }
@@ -67,12 +70,35 @@ export default function RoomPage({ params }: { params: { id: string } }) {
 
   const videoParticipants = roomUsers?.filter(p => p.isCameraOn);
 
+  if (roomError) {
+      return (
+          <div className="flex flex-col h-dvh bg-background">
+              <Header />
+              <main className="flex-1 flex flex-col items-center justify-center p-4">
+                  <Alert variant="destructive" className="max-w-md">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Access Denied</AlertTitle>
+                      <AlertDescription>
+                          We couldn't connect to this room. Please check the ID or your connection.
+                      </AlertDescription>
+                  </Alert>
+                  <Button asChild className="mt-4">
+                      <Link href="/">Back to Home</Link>
+                  </Button>
+              </main>
+          </div>
+      )
+  }
+
   if (isUserLoading || loadingRoom || !user) {
     return (
       <div className="flex flex-col h-dvh bg-background">
          <Header />
          <main className="flex-1 flex items-center justify-center">
-            <p>Joining room...</p>
+            <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p className="text-muted-foreground">Joining room...</p>
+            </div>
          </main>
       </div>
     )

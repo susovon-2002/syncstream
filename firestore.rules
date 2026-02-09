@@ -1,9 +1,8 @@
 /**
- * @fileoverview Firestore Security Rules for SyncStream.
+ * @fileoverview Updated Firestore Security Rules for SyncStream.
  *
- * This ruleset manages access for users, rooms, and room-related subcollections (chat, media, participants).
- * It focuses on allowing users to join rooms by updating the members map and ensures subcollection access
- * is granted to authenticated users.
+ * This ruleset allows all authenticated users (including anonymous guests) to
+ * participate in rooms, chat, and media sharing to ensure a seamless "watch party" experience.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -13,72 +12,20 @@ service cloud.firestore {
      * @description Controls access to user profiles.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(uid) {
-        return request.auth.uid == uid;
-      }
-
-      allow get: if isSignedIn();
+      allow get: if request.auth != null;
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if false;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
     }
 
     /**
-     * @description Controls access to rooms. Allows joining by adding self to the members map.
+     * @description Controls access to rooms and all their subcollections.
+     * Open to all signed-in users for prototyping simplicity and frictionless joining.
      */
     match /rooms/{roomId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow read, write: if request.auth != null;
 
-      function isHost() {
-        return resource.data.hostId == request.auth.uid;
-      }
-
-      function isMember() {
-        return request.auth.uid in resource.data.get('members', {});
-      }
-
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        isHost() || 
-        isMember() || 
-        // Allow joining: The request adds the current user to the members map
-        (request.resource.data.get('members', {})[request.auth.uid] != null)
-      );
-      allow delete: if isSignedIn() && isHost();
-
-      /**
-       * @description Tracks user presence (camera status, display name) within a specific room.
-       */
-      match /roomUsers/{roomUserId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && request.auth.uid == roomUserId;
-        allow delete: if false;
-      }
-
-      /**
-       * @description Stores media shared in the room.
-       */
-      match /media/{mediaId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update, delete: if false;
-      }
-
-      /**
-       * @description Stores chat messages sent in the room.
-       */
-      match /chatMessages/{chatMessageId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update, delete: if false;
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null;
       }
     }
   }
