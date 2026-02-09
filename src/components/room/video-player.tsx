@@ -51,6 +51,9 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
+  // Placeholder
+  const placeholderImage = PlaceHolderImages.find(img => img.id === 'video-placeholder');
+
   // Firebase Room State
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
   const [roomState, loadingRoomState] = useDocumentData(roomRef);
