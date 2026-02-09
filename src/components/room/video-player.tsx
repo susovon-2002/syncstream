@@ -23,7 +23,6 @@ interface VideoPlayerProps {
 
 const drawingColors = ['#E53935', '#1E88E5', '#43A047', '#FDD835', '#FFFFFF', '#000000'];
 
-
 export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
@@ -51,7 +50,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
-  // Placeholder
+  // Placeholder - Defining this clearly to avoid ReferenceError
   const placeholderImage = PlaceHolderImages.find(img => img.id === 'video-placeholder') || PlaceHolderImages[0];
 
   // Firebase Room State
