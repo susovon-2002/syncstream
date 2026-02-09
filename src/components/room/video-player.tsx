@@ -9,7 +9,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Camera, Video as Vid
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { useFirebase } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, collection, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import ReactPlayer from 'react-player/lazy';
@@ -22,15 +22,19 @@ interface VideoPlayerProps {
 }
 
 const drawingColors = ['#E53935', '#1E88E5', '#43A047', '#FDD835', '#FFFFFF', '#000000'];
+const ICE_SERVERS = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+    ],
+};
 
-// Robust global reference for the placeholder image to prevent ReferenceError
 const GLOBAL_PLACEHOLDER = PlaceHolderImages.find(img => img.id === 'video-placeholder') || PlaceHolderImages[0];
 
 export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
 
-  // Component State
   const [localMedia, setLocalMedia] = useState<string | MediaStream | null>(null);
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
@@ -40,35 +44,86 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const [isReady, setIsReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
 
-  // Drawing State
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingColor, setDrawingColor] = useState('#E53935');
   
-  // Refs
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<ReactPlayer>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const seekingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const peerConnections = useRef<{ [key: string]: RTCPeerConnection }>({});
 
-  // Firebase Room State
   const roomRef = useMemoFirebase(() => (firestore && roomId) ? doc(firestore, 'rooms', roomId) : null, [firestore, roomId]);
   const [roomState] = useDocumentData(roomRef);
   
   const isHost = user && roomState ? roomState.hostId === user.uid : false;
-
   const isScreenShare = roomState?.media?.source === 'screen';
-  const isYoutube = roomState?.media?.source === 'youtube';
-  const mediaUrl = isScreenShare ? localMedia : roomState?.media?.url;
+  const mediaUrl = isScreenShare && !isHost ? localMedia : (isScreenShare && isHost ? localMedia : roomState?.media?.url);
   const isPlaying = roomState?.playback?.isPlaying;
+
+  // WebRTC Screen Share Signaling
+  useEffect(() => {
+    if (!firestore || !user || !isScreenShare) return;
+
+    if (isHost && localMedia instanceof MediaStream) {
+      // Host: Broadcast screen stream
+      const signalsRef = collection(firestore, 'rooms', roomId, 'screenSignals');
+      const unsubscribe = onSnapshot(signalsRef, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const fromUid = change.doc.id;
+            if (data.offer && !data.answer) {
+              const pc = new RTCPeerConnection(ICE_SERVERS);
+              peerConnections.current[fromUid] = pc;
+              localMedia.getTracks().forEach(track => pc.addTrack(track, localMedia));
+              pc.onicecandidate = (e) => {
+                if (e.candidate) updateDoc(change.doc.ref, { answerCandidates: [...(data.answerCandidates || []), e.candidate.toJSON()] });
+              };
+              await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              updateDoc(change.doc.ref, { answer: { type: answer.type, sdp: answer.sdp } });
+            }
+          }
+        });
+      });
+      return () => unsubscribe();
+    } else if (!isHost) {
+      // Participant: Receive screen stream
+      const initPC = async () => {
+        const pc = new RTCPeerConnection(ICE_SERVERS);
+        const remoteStream = new MediaStream();
+        pc.ontrack = (e) => {
+          e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+          setLocalMedia(remoteStream);
+        };
+        const signalDoc = doc(firestore, 'rooms', roomId, 'screenSignals', user.uid);
+        pc.onicecandidate = (e) => {
+          if (e.candidate) setDoc(signalDoc, { offerCandidates: [...((await (await signalDoc.get()).data())?.offerCandidates || []), e.candidate.toJSON()] }, { merge: true });
+        };
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await setDoc(signalDoc, { offer: { type: offer.type, sdp: offer.sdp } });
+        const unsubscribe = onSnapshot(signalDoc, (d) => {
+          const data = d.data();
+          if (data?.answer && !pc.currentRemoteDescription) pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          if (data?.answerCandidates) data.answerCandidates.forEach((c: any) => pc.addIceCandidate(new RTCIceCandidate(c)));
+        });
+        return () => { unsubscribe(); deleteDoc(signalDoc); pc.close(); };
+      };
+      const cleanup = initPC();
+      return () => cleanup.then(c => c());
+    }
+  }, [firestore, user, isScreenShare, isHost, localMedia]);
 
   // Sync client player to Firebase state
   useEffect(() => {
     const video = playerRef.current;
     if (!video || !roomState?.playback || seekingRef.current || !isReady || isScreenShare) return;
-
     if(!roomState.playback.lastUpdated) return;
 
     const serverTime = roomState.playback.lastUpdated.toDate().getTime();
@@ -76,59 +131,39 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     const timeDiff = (clientTime - serverTime) / 1000;
     
     let targetTime = roomState.playback.progress;
-    if(isPlaying) {
-        targetTime += timeDiff;
-    }
+    if(isPlaying) targetTime += timeDiff;
 
     const localTime = video.getCurrentTime();
-
-    if (Math.abs(targetTime - localTime) > 2) {
-      video.seekTo(targetTime, 'seconds');
-    }
-
+    if (Math.abs(targetTime - localTime) > 2) video.seekTo(targetTime, 'seconds');
   }, [roomState, isReady, isPlaying, isScreenShare]);
-
 
   const updatePlaybackState = (state: any) => {
     if (!roomRef || isScreenShare || !user) return;
     setDocumentNonBlocking(roomRef, {
-        playback: {
-          ...roomState?.playback,
-          ...state,
-          lastUpdated: serverTimestamp(),
-        },
-      },
-      { merge: true }
+        playback: { ...roomState?.playback, ...state, lastUpdated: serverTimestamp() },
+      }, { merge: true }
     );
   };
 
   const handleSelectMedia = (url: string | MediaStream, title: string, source: 'youtube' | 'file' | 'screen') => {
     if (!isHost || !roomRef) return;
-    
     if (source === 'screen' && url instanceof MediaStream) {
       setLocalMedia(url);
       setDocumentNonBlocking(roomRef, {
         media: { url: null, title, source },
         playback: { isPlaying: true, progress: 0, lastUpdated: serverTimestamp() }
       }, { merge: true });
-
       url.getVideoTracks()[0].onended = () => {
         setLocalMedia(null);
         setDocumentNonBlocking(roomRef, { media: null, playback: null }, { merge: true });
       };
-
     } else if (typeof url === 'string') {
-      if (localMedia) {
-        if (localMedia instanceof MediaStream) {
-            localMedia.getTracks().forEach(track => track.stop());
-        }
-        setLocalMedia(null);
-      }
+      if (localMedia instanceof MediaStream) localMedia.getTracks().forEach(t => t.stop());
+      setLocalMedia(url);
       setDocumentNonBlocking(roomRef, {
           media: { url, title, source },
           playback: { isPlaying: false, progress: 0, lastUpdated: serverTimestamp() }
-        },
-        { merge: true }
+        }, { merge: true }
       );
     }
   };
@@ -138,10 +173,8 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   
   const handleProgress = (state: { playedSeconds: number }) => {
     setProgress(state.playedSeconds);
-     if (user && !seekingRef.current && !isScreenShare) {
-        if (isHost) {
-          updatePlaybackState({ progress: state.playedSeconds });
-        }
+     if (user && !seekingRef.current && !isScreenShare && isHost) {
+        updatePlaybackState({ progress: state.playedSeconds });
     }
   };
 
@@ -160,96 +193,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     setIsMuted(newVolume === 0);
   };
 
-  const handleMuteToggle = () => setIsMuted(!isMuted);
-
   const handleFullscreenToggle = () => {
     if (!playerContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) playerContainerRef.current.requestFullscreen();
+    else document.exitFullscreen();
   };
-
-  const handleScreenshot = () => {
-    if (!playerRef.current) return;
-    const player = playerRef.current.getInternalPlayer();
-    if (!player || !(player instanceof HTMLVideoElement)) {
-        toast({ variant: "destructive", title: "Cannot take screenshot", description: "This feature is not available for the current video type." });
-        return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = player.videoWidth;
-    canvas.height = player.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/png');
-    
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `syncstream-screenshot-${new Date().getTime()}.png`;
-    a.click();
-    toast({ title: "Screenshot saved!" });
-  };
-
-  const handleToggleRecording = () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      if (!playerRef.current) return;
-      const player = playerRef.current.getInternalPlayer();
-      if (!player || !(player instanceof HTMLVideoElement)) {
-        toast({ variant: 'destructive', title: 'Could not start recording', description: 'This feature is not available for the current video type.' });
-        return;
-      }
-      
-      const stream = (player as any).captureStream?.();
-      if (!stream) {
-        toast({ variant: 'destructive', title: 'Could not start recording', description: 'Unable to capture video stream.' });
-        return;
-      }
-      
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      recordedChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `syncstream-recording-${new Date().getTime()}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast({ title: "Recording saved!" });
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-      toast({ title: "Recording started..." });
-    }
-  };
-
-  useEffect(() => {
-    if (mediaRecorderRef.current?.state === 'recording' && !isPlaying) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
 
   const formatTime = (time: number) => {
     if (isNaN(time) || time < 0) return '0:00';
@@ -258,7 +206,6 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Drawing logic
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !playerContainerRef.current) return;
@@ -267,56 +214,15 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     canvas.height = height;
   }, [isDrawingMode]);
 
-  const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawingMode) return;
-    const { offsetX, offsetY } = nativeEvent;
-    const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
-    context.strokeStyle = drawingColor;
-    context.lineWidth = 5;
-    context.lineCap = 'round';
-    context.beginPath();
-    context.moveTo(offsetX, offsetY);
-    setIsDrawing(true);
-  };
-
-  const finishDrawing = () => {
-    if (!isDrawingMode || !isDrawing) return;
-    const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
-    context.closePath();
-    setIsDrawing(false);
-  };
-
-  const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !isDrawingMode) return;
-    const { offsetX, offsetY } = nativeEvent;
-    const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
-    context.lineTo(offsetX, offsetY);
-    context.stroke();
-  };
-  
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-
-  const showPlayer = !!mediaUrl || (isHost && isScreenShare);
-
   return (
-    <Card ref={playerContainerRef} className="h-full w-full bg-card/80 flex flex-col items-center justify-center relative overflow-hidden group">
-      {!showPlayer ? (
-        <div className="w-full max-w-lg p-4">
+    <Card ref={playerContainerRef} className="h-full w-full bg-card/80 flex flex-col items-center justify-center relative overflow-hidden group shadow-2xl rounded-xl border-border/30">
+      {(!mediaUrl && !isScreenShare) ? (
+        <div className="w-full max-w-lg p-4 z-10">
           {isHost ? (
             <AddMediaTabs onUrlSelect={handleSelectMedia} />
           ) : (
-            <div className="text-center text-muted-foreground">
-              <p>Waiting for the host to select a video...</p>
+            <div className="text-center text-muted-foreground animate-pulse">
+              <p>Waiting for the host to start the stream...</p>
             </div>
           )}
         </div>
@@ -338,68 +244,52 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
                 onDuration={setDuration}
                 progressInterval={1000}
                 config={{
-                    youtube: { playerVars: { showinfo: 0, controls: 0 } },
+                    youtube: { playerVars: { showinfo: 0, controls: 0, rel: 0 } },
                     file: { attributes: { style: { objectFit: 'contain' }, crossOrigin: 'anonymous' } }
                 }}
             />
             {isDrawingMode && (
                 <canvas
                     ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full cursor-crosshair"
-                    onMouseDown={startDrawing}
-                    onMouseUp={finishDrawing}
-                    onMouseMove={draw}
-                    onMouseLeave={finishDrawing}
+                    className="absolute top-0 left-0 w-full h-full cursor-crosshair z-20"
+                    onMouseDown={(e) => {
+                        const context = canvasRef.current?.getContext('2d');
+                        if (!context) return;
+                        context.strokeStyle = drawingColor;
+                        context.lineWidth = 5;
+                        context.lineCap = 'round';
+                        context.beginPath();
+                        context.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+                        setIsDrawing(true);
+                    }}
+                    onMouseUp={() => { setIsDrawing(false); canvasRef.current?.getContext('2d')?.closePath(); }}
+                    onMouseMove={(e) => {
+                        if (!isDrawing) return;
+                        const context = canvasRef.current?.getContext('2d');
+                        if (!context) return;
+                        context.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+                        context.stroke();
+                    }}
                 />
             )}
         </>
       )}
 
-      {showPlayer && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          
-          {isDrawingMode && (
-            <div className="absolute bottom-20 left-4 flex gap-2 items-center bg-background/50 p-2 rounded-md">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="w-8 h-8" style={{ backgroundColor: drawingColor, border: '2px solid white' }} />
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2">
-                  <div className="flex gap-1">
-                    {drawingColors.map(color => (
-                      <Button
-                        key={color}
-                        variant="ghost"
-                        size="icon"
-                        className="w-8 h-8 rounded-full"
-                        style={{ backgroundColor: color }}
-                        onClick={() => setDrawingColor(color)}
-                      />
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={clearCanvas}>
-                  <Eraser />
-                </Button>
-            </div>
-          )}
-
+      {mediaUrl && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
           {!isScreenShare && (
-            <div className="flex flex-col gap-2">
-              <Slider
+            <Slider
                 value={[progress]}
                 max={duration}
                 onValueChange={user ? handleSeek : undefined}
                 onPointerDown={() => seekingRef.current = true}
                 onPointerUp={() => seekingRef.current = false}
-                className={user ? "cursor-pointer" : "cursor-default"}
+                className="mb-4"
                 disabled={!user}
-              />
-            </div>
+            />
           )}
 
-          <div className="flex items-center justify-between text-white mt-2">
+          <div className="flex items-center justify-between text-white">
             <div className="flex items-center gap-4">
               {!isScreenShare && (
                 <>
@@ -407,41 +297,35 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
                   {isPlaying ? <Pause /> : <Play />}
                 </Button>
                 <div className="flex items-center gap-2 w-32">
-                  <Button variant="ghost" size="icon" className="text-white hover-bg-white/10" onClick={handleMuteToggle}>
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setIsMuted(!isMuted)}>
                     {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
                   </Button>
                   <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={handleVolumeChange} className="cursor-pointer"/>
                 </div>
-                <div className="text-xs font-mono">
+                <div className="text-xs font-mono opacity-70">
                   <span>{formatTime(progress)}</span> / <span>{formatTime(duration)}</span>
                 </div>
                 </>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleScreenshot} disabled={isYoutube}>
-                  <Camera />
-              </Button>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleToggleRecording} disabled={isYoutube}>
-                  {isRecording ? <Circle className="text-red-500 fill-current" /> : <VideoIcon />}
-              </Button>
               <Button variant="ghost" size="icon" className={`text-white hover:bg-white/10 ${isDrawingMode ? 'bg-white/20' : ''}`} onClick={() => setIsDrawingMode(!isDrawingMode)}>
-                  <PenTool />
+                  <PenTool className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleFullscreenToggle}>
-              {isFullscreen ? <Minimize /> : <Maximize />}
+                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {!showPlayer && GLOBAL_PLACEHOLDER && (
+      {!mediaUrl && !isScreenShare && GLOBAL_PLACEHOLDER && (
         <Image
           src={GLOBAL_PLACEHOLDER.imageUrl}
           alt={GLOBAL_PLACEHOLDER.description}
           fill
-          className="object-cover -z-10 opacity-20"
+          className="object-cover -z-10 opacity-30 grayscale blur-sm"
           data-ai-hint={GLOBAL_PLACEHOLDER.imageHint}
         />
       )}
