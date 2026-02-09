@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const Logo = () => (
@@ -27,7 +30,11 @@ const Logo = () => (
 );
 
 export function Footer() {
-  const currentYear = new Date().getFullYear();
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   return (
     <footer className="bg-card/20 text-foreground/80 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
@@ -67,10 +74,10 @@ export function Footer() {
       </div>
       <div className="container mx-auto text-center mt-10 border-t border-border/50 pt-6">
         <p className="text-sm text-foreground/60">
-            &copy; {currentYear} SyncStream. All Rights Reserved.
+            &copy; {currentYear || '...'} SyncStream. All Rights Reserved.
         </p>
         <p className="text-sm text-foreground/60 mt-2">
-            Made with ❤️ in the India
+            Made with ❤️ in India
         </p>
       </div>
     </footer>

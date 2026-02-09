@@ -52,11 +52,11 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
   const recordedChunksRef = useRef<Blob[]>([]);
 
   // Placeholder
-  const placeholderImage = PlaceHolderImages.find(img => img.id === 'video-placeholder');
+  const placeholderImage = PlaceHolderImages.find(img => img.id === 'video-placeholder') || PlaceHolderImages[0];
 
   // Firebase Room State
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
-  const [roomState, loadingRoomState] = useDocumentData(roomRef);
+  const [roomState] = useDocumentData(roomRef);
   
   const isHost = user && roomState ? roomState.hostId === user.uid : false;
 
@@ -190,7 +190,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
     
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `syncstream-screenshot-${new Date().toISOString()}.png`;
+    a.download = `syncstream-screenshot-${new Date().getTime()}.png`;
     a.click();
     toast({ title: "Screenshot saved!" });
   };
@@ -207,7 +207,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
         return;
       }
       
-      const stream = (player as any).captureStream();
+      const stream = (player as any).captureStream?.();
       if (!stream) {
         toast({ variant: 'destructive', title: 'Could not start recording', description: 'Unable to capture video stream.' });
         return;
@@ -227,7 +227,7 @@ export function VideoPlayer({ roomId }: VideoPlayerProps) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `syncstream-recording-${new Date().toISOString()}.webm`;
+        a.download = `syncstream-recording-${new Date().getTime()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
         toast({ title: "Recording saved!" });

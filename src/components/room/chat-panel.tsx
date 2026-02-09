@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { Separator } from '../ui/separator';
 import { useFirebase } from '@/firebase';
 import { useCollection, useDoc } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, limit, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import {
   DropdownMenu,
@@ -20,8 +21,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 
+// Dynamically import EmojiPicker to prevent SSR issues
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
 export function ChatPanel({ roomId }: { roomId: string }) {
   const { firestore, user } = useFirebase();
@@ -33,7 +35,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const roomRef = useMemoFirebase(() => doc(firestore, 'rooms', roomId), [firestore, roomId]);
-  const { data: room, isLoading: loadingRoom } = useDoc(roomRef);
+  const { data: room } = useDoc(roomRef);
 
   const messagesRef = useMemoFirebase(() => collection(firestore, 'rooms', roomId, 'chatMessages'), [firestore, roomId]);
   const messagesQuery = useMemoFirebase(() => query(messagesRef, orderBy('timestamp', 'asc'), limit(50)), [messagesRef]);
@@ -45,7 +47,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const isHost = user && room ? room.hostId === user.uid : false;
 
   const handleMakeHost = (newHostId: string) => {
-    if (!isHost || !user) return;
+    if (!isHost || !user || !room) return;
     const oldHostId = user.uid;
 
     const updatedMembers = {
@@ -63,15 +65,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
   const getUsername = (userId: string) => {
     const participant = participants?.find(p => p.uid === userId);
     const displayName = participant?.displayName || 'Anonymous';
-    if (displayName.includes(' ')) {
-      return displayName.split(' ')[0];
-    }
-    return displayName;
-  }
-  
-  const getUserAvatar = (userId: string) => {
-    const participant = participants?.find(p => p.uid === userId);
-    return participant?.photoURL;
+    return displayName.split(' ')[0];
   }
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -84,9 +78,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
         };
 
         if (mediaFile) {
-            // In a real app, you'd upload this to a storage service
-            // and save the URL. For now, we use a local object URL.
-            messageData.mediaUrl = mediaPreview; // Using local object URL
+            messageData.mediaUrl = mediaPreview;
             messageData.mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
         }
       
@@ -97,13 +89,12 @@ export function ChatPanel({ roomId }: { roomId: string }) {
     }
   };
 
-  const onEmojiClick = (emojiData: EmojiClickData) => {
+  const onEmojiClick = (emojiData: any) => {
     setNewMessage(prevMessage => prevMessage + emojiData.emoji);
   };
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-        // @ts-ignore
         scrollAreaRef.current.scrollTo({
             top: scrollAreaRef.current.scrollHeight,
             behavior: 'smooth'
@@ -227,7 +218,7 @@ export function ChatPanel({ roomId }: { roomId: string }) {
           )}
           <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
             <Input
-              placeholder={user ? "Say something..." : "Sign in to chat"}
+              placeholder={user ? "Say something..." : "Joining..."}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               disabled={!user}

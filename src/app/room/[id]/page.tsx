@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-export default function RoomPage({ params }: { params: { id: string } }) {
+export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { firestore, user, isUserLoading } = useFirebase();
 
@@ -28,7 +28,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
   const [room, loadingRoom, roomError] = useDocumentData(roomRef);
 
   const roomUsersRef = useMemoFirebase(
-    () => (firestore && user && !isUserLoading) ? collection(roomRef!, 'roomUsers') : null, 
+    () => (firestore && user && !isUserLoading && roomRef) ? collection(roomRef, 'roomUsers') : null, 
     [firestore, user, isUserLoading, roomRef]
   );
   const { data: roomUsers, isLoading: loadingUsers } = useCollection(roomUsersRef);
